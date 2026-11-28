@@ -149,14 +149,18 @@ window.AthenaProjectGraph={create({load,openPaper}){
     }
     body.replaceChildren(fragment);
   }
-  async function refresh(){
-    if(!element.open||loading)return;
-    const g=generation;loading=true;
+  let catalogKey,checkedAt=0;
+  async function refresh(poll=false){
+    if(!element.open||loading||(poll===true && Date.now()-checkedAt<5000))return;
+    const g=generation;loading=true;checkedAt=Date.now();
     if(!catalog)body.textContent='Loading project records…';
-    try{const data=await load();if(g===generation){catalog=data;draw();}}
-    catch(e){if(g===generation)body.replaceChildren(el('p',e.message),button('Reload project records',refresh));}
+    try{
+      const data=await load(),key=JSON.stringify(data);
+      if(g===generation && key!==catalogKey){catalog=data;catalogKey=key;draw();}
+    }
+    catch(e){if(g===generation){catalogKey=undefined;body.replaceChildren(el('p',e.message),button('Reload project records',refresh));}}
     finally{if(g===generation)loading=false;}
   }
   element.ontoggle=()=>{if(element.open)refresh();};
-  return {element,refresh,reset(){generation++;loading=false;catalog=null;focus=null;element.open=false;body.replaceChildren();}};
+  return {element,refresh,reset(){generation++;loading=false;catalog=null;catalogKey=undefined;checkedAt=0;focus=null;element.open=false;body.replaceChildren();}};
 }};

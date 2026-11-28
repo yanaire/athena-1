@@ -92,6 +92,7 @@ async function fixture(t: TestContext, handler: Handler, withReference=false) {
     }})) };
     else {
       calls.push({ authorization: req.headers.authorization, args: message.params.arguments });
+      if(connection.dropInvocation){req.socket.destroy();return;}
       if (connection.loseReply) { res.destroy(); return; }
       const credential = req.headers.authorization?.replace(/^Bearer /, '') ?? '';
       result = { content: [{ type: 'text', text: String(message.params.arguments.value * 2) }],
@@ -489,4 +490,52 @@ test('cancelling a research worker from the desktop stops the autonomous study a
   assert.equal((await flow()).checkpoint,stopped.checkpoint);
   assert.equal((await flow()).autonomy.state,'stopped');
   assert.equal(f.hits.length,hits);
+});
+
+test('a confirmed uncertain external trial remains unmeasured and is never dispatched again',researchOptions,async t=>{
+  const measurementTool={serverId:'laboratory/remote',tool:'double'};
+  let missionId='';
+  const reports:{status:string;trials:{outcome?:{error?:string}}[]}[]=[];
+  const f=await fixture(t,(wire,res)=>{
+    const results=outputs(wire);
+    if(wire.tools && parent(wire)){
+      const resumed=input(wire).includes('Continue this research request');
+      if(!results.length && !resumed)return completion(res,{name:'plan_research',args:{objective:'Measure once',acceptanceCriteria:['Proven value'],stages:['Measure','Verify']}});
+      if(!results.length || (!resumed && results.length===1)){
+        if(!resumed)missionId=JSON.parse(results[0]!).id;
+        return completion(res,{name:'run_experiment_mission',args:{missionId,...(resumed?{}:{contract:{protocol:'Measure once',resultFile:'mcp-result.json',metricPath:['result','structuredContent','doubled'],direction:'at_least',target:14,maxTrials:1,fileIds:[],measurementTool}})}});
+      }
+      reports.push(JSON.parse(results.at(-1)!));
+      return completion(res,'Saved the reported trial state.');
+    }
+    if(input(wire).includes('Select the next experiment'))return completion(res,JSON.stringify({action:'experiment',reason:'Measure the only condition',instruction:'Measure 7',parentTrial:null}));
+    if(!results.length)return completion(res,{name:'call_external_mcp',args:{...measurementTool,arguments:{value:7}}});
+    completion(res,'Reported the failed tool response.');
+  });
+  const {manager}=await f.manager();
+  const {project}=await manager.createProject({name:'Uncertain instrument',researchWorkflow:true});
+  await f.install(manager,project.id);
+  const {sessionId}=await manager.createSession({projectId:project.id,title:'Lost tool response'});
+  f.connection.dropInvocation=true;
+  await manager.pi(sessionId,{type:'prompt',id:'lost-response',message:'Measure once and write a paper.'});
+  await terminal(manager);
+  assert.equal(reports[0]?.status,'blocked');
+  assert.equal(f.calls.length,1);
+  const scope={projectId:project.id,sessionId};
+  type Flow={runId:string;checkpoint:string;autonomy:{state:string;uncertainProcessIds?:string[]}};
+  const read=()=>manager.paperRequest('researchFlow',scope) as Promise<Flow>;
+  let flow=await read();
+  const until=Date.now()+8000;
+  while(flow.autonomy.state!=='blocked' && Date.now()<until){
+    await new Promise(resolve=>setTimeout(resolve,50));
+    flow=await read();
+  }
+  assert.equal(flow.autonomy.uncertainProcessIds?.length,1);
+  const checkpoint={...scope,runId:flow.runId,expectedAttemptId:flow.checkpoint};
+  await assert.rejects(manager.paperRequest('resumeResearch',checkpoint),{code:'CHECKPOINT_UNAVAILABLE'});
+  f.connection.dropInvocation=false;
+  await manager.paperRequest('resumeResearch',{...checkpoint,confirmedProcessIds:flow.autonomy.uncertainProcessIds});
+  await when(manager,s=>s.run.status==='succeeded' && reports.some(report=>report.status==='exhausted'));
+  assert.match(reports.at(-1)!.trials[0]!.outcome!.error!,/remote outcome was checked/);
+  assert.deepEqual(f.calls.map(c=>c.args),[{value:7}]);
 });

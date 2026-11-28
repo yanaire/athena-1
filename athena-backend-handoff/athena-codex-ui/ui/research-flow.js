@@ -128,7 +128,7 @@ window.AthenaResearchFlow={mount(root,options){
       const artifacts=snapshot?.artifacts||[];
       for(const a of artifacts)frag.append(button(a.title||a.name||'Result file',()=>options.open('artifacts',{artifactId:a.id,version:a.version})));
       if(!artifacts.length)frag.append(el('p','No experiment outputs have been recorded yet.'));
-    }else frag.append(el('p','This conversation has no linked manuscript.'));
+    }else frag.append(button('Manage manuscripts',()=>options.editor('').catch(e=>{notice.textContent=e.message;})));
   }
   function render(){
     signature=viewSignature();
@@ -289,6 +289,7 @@ window.AthenaResearchFlow={mount(root,options){
     try{
       const r=await call('researchFlow',selectedRun?{runId:selectedRun}:{});if(g!==generation)return;
       report=r;
+      if(tab==='preview')void graph.refresh(true);
       const fresh=lastStream && r?.runId===lastStream.runId && performance.now()-lastStream.received<1900;
       const ahead=fresh && (!r.liveDraft||lastStream.draft.updatedAt>r.liveDraft.updatedAt);
       displayDraft(ahead && !r.version?lastStream.draft:r?.liveDraft);

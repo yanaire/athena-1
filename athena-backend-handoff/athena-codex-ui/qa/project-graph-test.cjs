@@ -17,14 +17,14 @@ const catalog={
     {sourceId:'old',version:'v2',title:'Updated reference manual'}
   ]
 };
-async function render(){
+async function render(load=async()=>catalog,clock=Date){
   const {window,document}=parseHTML('<main></main>');
-  vm.runInNewContext(readFileSync(join(__dirname,'../ui/project-graph.js'),'utf8'),{document,window});
+  vm.runInNewContext(readFileSync(join(__dirname,'../ui/project-graph.js'),'utf8'),{document,window,Date:clock});
   const opened=[];
-  const {element,refresh}=window.AthenaProjectGraph.create({load:async()=>catalog,openPaper:async id=>opened.push(id)});
+  const {element,refresh}=window.AthenaProjectGraph.create({load,openPaper:async id=>opened.push(id)});
   document.querySelector('main').append(element);element.open=true;await refresh();
   const button=label=>[...element.querySelectorAll('button')].find(b=>b.textContent===label);
-  return {element,button,opened};
+  return {element,button,opened,refresh};
 }
 test('two manuscripts converge on one exact edition with separately selectable unlinked project records',async()=>{
   const {element,button,opened}=await render();
@@ -46,4 +46,18 @@ test('two manuscripts converge on one exact edition with separately selectable u
   await button('Open manuscript').onclick();assert.deepEqual(opened,['filter']);
   button('← Project library').click();button('Updated reference manual').click();
   assert.match(element.textContent,/No manuscript is linked to this edition/);
+});
+
+test('an expanded graph picks up newly saved literature without rebuilding unchanged nodes',async()=>{
+  let time=10000,calls=0;
+  const data=structuredClone(catalog);
+  const {element,button,refresh}=await render(async()=>{calls++;return data;},{now:()=>time});
+  const original=button('Reference measurements');
+  await refresh(true);assert.equal(calls,1);
+  time+=6000;await refresh(true);
+  assert.equal(button('Reference measurements'),original);
+  data.sources.push({sourceId:'added',version:'v1',title:'Newly retrieved article'});
+  time+=6000;await refresh(true);
+  assert.ok(button('Newly retrieved article'));
+  element.open=false;time+=6000;await refresh(true);assert.equal(calls,3);
 });

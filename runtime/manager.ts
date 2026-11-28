@@ -563,16 +563,18 @@ export class TaskManager implements AthenaTaskManager {
         const outcome=await this.#measureTrial(a,study,trial,worker,signal);
         if('error' in outcome){
           const processes=this.#storage.records<ProcessRow>('process',a.sessionId).filter(p=>p.attemptId===worker.id);
-          const external=processes.filter(p=>p.job.externalMcp);
-          const uncertain=external.find(p=>p.status!=='succeeded' && (!p.job.externalFailure||p.job.externalFailure==='outcome_unknown'));
-          const blocked=external.find(p=>p.job.externalFailure==='blocked');
-          const disconnected=external.findLast(p=>p.job.externalFailure==='connection');
-          if(uncertain||blocked||disconnected){
-            if(!uncertain)trial.reconnectWorker=worker.id;
-            const problem=uncertain??blocked??disconnected!;
-            throw new Error('Trial '+trial.number+' paused on '+problem.job.externalMcp!.tool+': '+
-              (problem.job.error??problem.job.externalFailure??'external outcome unknown'));
+          const confirmed=this.#storage.get<string[]>('research.confirmed:'+a.runId)??[];
+          const connection=recoveryConnections(processes,confirmed);
+          if(connection.blocked)throw new Error('Trial '+trial.number+': '+connection.blocked);
+          const unavailable=connection.unavailable?.at(-1);
+          if(unavailable){
+            trial.reconnectWorker=worker.id;
+            throw new Error('Trial '+trial.number+' paused on '+unavailable.job.externalMcp!.tool+': '+
+              (unavailable.job.error??unavailable.job.externalFailure));
           }
+          // An operator can reconcile uncertain remote effects. Without a published
+          // measurement the trial remains unmeasured, and its call is never replayed.
+          if(processes.some(p=>confirmed.includes(p.id)))outcome.error='The remote outcome was checked. '+outcome.error;
           if(worker.status!=='succeeded' && !processes.length){
             trial.reconnectWorker=worker.id;
             throw new Error('Trial '+trial.number+' stopped before any program was started: '+outcome.error);
