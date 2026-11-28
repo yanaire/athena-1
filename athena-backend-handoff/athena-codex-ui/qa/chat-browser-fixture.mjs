@@ -26,7 +26,7 @@ export const inputs = Object.freeze([
 const text = value => typeof value === 'string' ? value : Array.isArray(value) ? value.map(part => part?.text || '').join('\n') : '';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function createFixture(researchResponder, { hostNodeArgs = [], modelConcurrency = 2, streamSections = false } = {}) {
+export async function createFixture(researchResponder, { hostNodeArgs = [], modelConcurrency = 2, maxChildren = 3, streamSections = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'athena-chat-browser-'));
   const failures = [], calls = [];
   let child, origin = '', hostPort = 0, hostOutput = '';
@@ -89,6 +89,9 @@ export async function createFixture(researchResponder, { hostNodeArgs = [], mode
           }
         }
       }
+      if(next instanceof Response){
+        response.writeHead(next.status,Object.fromEntries(next.headers));response.end(await next.text());return;
+      }
       response.writeHead(200, { 'content-type': 'text/event-stream' });
       if (before) {
         response.write(frame({ role: 'assistant', content: before }));
@@ -124,7 +127,7 @@ export async function createFixture(researchResponder, { hostNodeArgs = [], mode
     child = spawn(process.execPath, [...hostNodeArgs, 'runtime/server.ts'], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'], env: {
       ...process.env, ATHENA_DATA_DIR: directory, ATHENA_PORT: String(hostPort),
       ATHENA_ENDPOINT: `http://127.0.0.1:${providerPort}/v1`, ATHENA_MODEL: 'browser-fixture',
-      ATHENA_PROVIDER: '', ATHENA_API_KEY: '', ATHENA_MODEL_CONCURRENCY: String(modelConcurrency), ATHENA_MAX_CHILDREN: '3', ATHENA_MAX_DEPTH: '1',
+      ATHENA_PROVIDER: '', ATHENA_API_KEY: '', ATHENA_MODEL_CONCURRENCY: String(modelConcurrency), ATHENA_MAX_CHILDREN: String(maxChildren), ATHENA_MAX_DEPTH: '1',
     } });
     hostOutput = '';
     const started = new Promise((resolve, reject) => {

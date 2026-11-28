@@ -126,7 +126,8 @@ async function verifyDownloads(snapshot, useBrowser) {
   for (const artifact of snapshot.artifacts) {
     let bytes;
     if (useBrowser) {
-      await page.evaluate(id => window.AthenaApp.openWorkspace('artifacts', { artifactId: id }), artifact.id);
+      await page.locator('[data-flow-tab="results"]').click();
+      await page.locator('[data-flow-body]').getByRole('button',{name:artifact.file.name,exact:true}).click();
       await page.locator('[data-awv-artifact-view] a[download]').first().waitFor({ state: 'visible' });
       const transfer = page.waitForEvent('download');
       await page.locator('[data-awv-artifact-view] a[download]').first().click();
@@ -191,7 +192,10 @@ try {
     assert.ok(sequence.findIndex(row => row.attempt) < sequence.findIndex(row => row.text.includes('Both calculations completed.')));
     checks.push('Child activities stay with their originating turn, show real actions and do not expose internal IDs or attachment instructions.');
     await shot('02-completed-chat');
-    await page.evaluate(() => window.AthenaApp.openWorkspace('workflow'));
+    const nav=page.getByRole('navigation',{name:'Research views'});
+    assert.deepEqual(await nav.getByRole('button').allTextContents(),['Workflow','Experiment results','Paper']);
+    await nav.getByRole('button',{name:'Workflow',exact:true}).click();
+    await page.locator('[data-flow-body]').getByRole('button',{name:'Workflow graph',exact:true}).click();
     await page.locator('[data-awv-action="workflow-mode"][data-awv-value="graph"]').click();
     await page.locator('[data-awv-workflow-map]').waitFor({ state: 'visible' });
     assert.match(await page.locator('[data-awv-workflow-map]').innerText(), /Summarize voltage measurements/);
@@ -292,7 +296,8 @@ try {
       assert.equal(sha(Buffer.from(await response.arrayBuffer())), artifact.file.sha256);
     }
     await shot('08-restored-chat');
-    await page.evaluate(() => window.AthenaApp.openWorkspace('manuscript'));
+    await page.locator('[data-flow-tab="preview"]').click();
+    await page.getByRole('button',{name:'Manage manuscripts',exact:true}).click();
     const panel=page.locator('#ac-paper-project');
     await panel.getByText('New manuscript and sources',{exact:true}).click();
     await panel.getByText('Search Crossref',{exact:true}).click();

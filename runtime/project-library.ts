@@ -163,6 +163,11 @@ export class ProjectLibrary {
       return {bytes,name:file.file.endsWith('.pdf')?'paper.pdf':'paper.xml',mimeType:file.file.endsWith('.pdf')?'application/pdf':'application/xml'};
     }finally{closeSync(fd);}
   }
+  catalog(project:string,conversation:string){
+    return this.entries(project).map(e=>({sourceId:e.sourceId,version:e.version,url:e.url,doi:e.doi,
+      coverage:e.coverage,note:e.note,retrievedAt:e.retrievedAt,originalFile:e.original?.file,
+      originalUri:e.original?'/api/artifacts/'+conversation+'/library-'+e.sourceId:undefined}));
+  }
   uiSources(project:string,conversation:string){
     return {sources:this.entries(project).map(e=>({projectId:project,sourceId:e.sourceId,version:e.version,title:e.title,kind:'documents',format:e.original?.file.endsWith('.pdf')?'Article':'Paper',
       text:this.papers.source(project,e.sourceId).content,createdAt:e.retrievedAt,persistence:'host',originalLocation:{uri:e.url,label:'Athena Library/'+project+'/'+e.note},

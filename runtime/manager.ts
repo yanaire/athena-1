@@ -19,7 +19,8 @@ import { Journal, context, toolId, normalizeEvent } from './orchestration-journa
 import { projectHistory, withoutAttachmentContext, withMessageOwner } from './history.ts';
 import { ToolFailureBudget } from './tool-failure-budget.ts';
 import { ExtensionStore, emptyExtensionPin, mentionedSkills, type ExtensionPin } from './extensions.ts';
-import { discoverExternalMcp, extensionDigest } from './external-mcp-client.ts';
+import { autonomous, newAutonomy, recoveryConnections, type ResearchAutonomy } from './research-continuation.ts';
+import { discoverExternalMcp, extensionDigest, probePinnedExternalMcp, isTransientExternalConnectionError } from './external-mcp-client.ts';
 import { Bibliography } from './bibliography.ts';
 import { CrossrefProvider, type BibliographicProvider } from './crossref.ts';
 import { experimentContract, plannerDecision, missionPlannerPrompt, measuredMetric, missionProgress, type ExperimentMission, type MissionTrial } from './experiment-mission.ts';
@@ -29,7 +30,7 @@ import { projectFolder } from './project-folder.ts';
 import { template, readTemplate } from './typesetting.ts';
 import { parseManuscriptJson, streamedManuscript, sectionBriefs, type ManuscriptDraft } from './manuscript-draft.ts';
 import { manuscriptSectionChecks, Papers, bounded, headings, inspectLinks, sectionDrafts, type Paper, type PaperRun, type PaperSource } from './papers.ts';
-import { ResearchLedger, type ResearchTarget } from './research.ts';
+import { ResearchLedger, type ResearchReview, type ResearchTarget } from './research.ts';
 import type { CredentialStore } from '@earendil-works/pi-ai';
 import type { AttachmentMessage, HistoryEvent } from './history.ts';
 export { ManagerError } from './orchestration.ts';
@@ -66,7 +67,8 @@ export type Run = {
   readonly cancellationRequested?: boolean;
   readonly recovery?: { readonly requestId: string; readonly reconciliationAttemptId: string };
 };
-type ResearchFlow={planMode?:'coordinator';runId:string;input:string;fileIds:readonly string[];searchIds:string[];drafts:{heading:string;text:string}[];
+type EvidenceRevision={documentId:string;version:string;reviewId:string;paperRunId:string;reason:string;returnedAt:number};
+type ResearchFlow={evidenceRevisions?:EvidenceRevision[];planMode?:'coordinator';runId:string;input:string;fileIds:readonly string[];searchIds:string[];drafts:{heading:string;text:string}[];
   tables?:{artifactId:string;version:string;condition:string;count:number;rows:Record<string,string|number>[];path:string[]}[];
   inputs?:{sourceId:string;version:string;title:string}[];pages?:{sourceId:string;version:string;url:string;retrievedAt:string;claim:string;coverage:string}[];documentId?:string;handoff?:string;citations?:{sourceId:string;claim:string}[];error?:string};
 type StoredFile = FileReference & {
@@ -139,10 +141,11 @@ export type RetryTaskResult = Omit<Accepted, 'status' | 'parentTaskId'> & { read
 type RetryReceipt = { readonly id: string; readonly projectId: string; readonly sessionId: string; readonly runId: string;
   readonly taskId: string; readonly requestId: string; readonly expectedAttemptId: string; readonly fingerprint: string;
   readonly response: RetryTaskResult };
+type ContinuationAdmission=(receipt:{runId:string;attemptId:string})=>void;
 type Live = { runtime: ManagedPiSession; controller: AbortController; attempt: Attempt; finished: Promise<void> };
 
 export class TaskManager implements AthenaTaskManager {
-  readonly capabilities: AthenaTaskManager['capabilities'] = ['create_project', 'create_session', 'open_session', 'set_project_model', 'set_project_execution', 'cancel_run', 'cancel_task', 'retry_task', 'get_agent_history', 'extensions', 'research_workflow'];
+  readonly capabilities: AthenaTaskManager['capabilities'] = ['create_project', 'create_session', 'open_session', 'background_sessions', 'set_project_model', 'set_project_execution', 'cancel_run', 'cancel_task', 'retry_task', 'get_agent_history', 'extensions', 'research_workflow'];
   readonly inputContract = {
     maxMessageCharacters: 262144, lengthUnit: 'utf16-code-units',
     supportsFileReferences: true, canStageFiles: true, supportsStreamingPrompts: false,
@@ -190,6 +193,9 @@ export class TaskManager implements AthenaTaskManager {
   readonly #scheduler = new TurnScheduler(this.#modelConcurrency);
   readonly #maxChildren = limit('ATHENA_MAX_CHILDREN', 8, 0, 128);
   readonly #depth = limit('ATHENA_MAX_DEPTH', 1, 0, 1);
+  #continuationTimer?:NodeJS.Timeout;
+  #continuing?:Promise<void>;
+  #selection = 0;
   #active: string | null = null;
   #busy = false;
   #ready = false;
@@ -237,14 +243,15 @@ export class TaskManager implements AthenaTaskManager {
       this.#access = await this.#jobs.analysisAccess();
       if (this.#active) await this.#openRoot(this.#session(this.#active));
       this.#ready = true;
+      this.#wakeResearch();
     } finally { this.#busy = false; }
   }
   #assertReady(): void {
     if (!this.#ready || this.#closed) throw new ManagerError('NOT_READY', 'TaskManager is not initialized.');
   }
-  #assertIdle(): void {
+  #assertIdle(sessionId=this.#active): void {
     this.#assertReady();
-    if (this.#busy || (this.#active && this.#runs(this.#active).some(run => pending(run.status)))) {
+    if (this.#busy || (sessionId && this.#runs(sessionId).some(run => pending(run.status)))) {
       throw new ManagerError('SESSION_BUSY', 'The active session must settle before switching.');
     }
   }
@@ -253,10 +260,10 @@ export class TaskManager implements AthenaTaskManager {
     if (!session) throw new ManagerError('SESSION_NOT_FOUND', 'Session does not exist.');
     return session;
   }
-  #bound(id: string) {
+  #bound(id: string,readOnly=false) {
     this.#assertReady();
     const runtime = this.#registry.get(id);
-    if (this.#busy || id !== this.#active || !runtime) throw new ManagerError('SESSION_MISMATCH', 'Request is not bound to the selected Pi session.');
+    if ((!readOnly && this.#busy) || id !== this.#active || !runtime) throw new ManagerError('SESSION_MISMATCH', 'Request is not bound to the selected Pi session.');
     return {session:this.#session(id),runtime};
   }
   #projectDir(projectId:string) { return join(this.#directory, 'projects', projectId); }
@@ -427,10 +434,19 @@ export class TaskManager implements AthenaTaskManager {
       if (previous && !pending(previous.status) && previous.status!=='succeeded' && ref.coordinatorAttemptId!==a.id)
         trial.rejectedPlanner=previous.id;
     }
-    if (!ref || (role==='mission' && ref.attemptId===trial.rejectedPlanner)) {
+    const reconnect = role==='experiment' && ref && ref.attemptId===trial.reconnectWorker && ref.coordinatorAttemptId!==a.id ? ref : undefined;
+    if (!ref || reconnect || (role==='mission' && ref.attemptId===trial.rejectedPlanner)) {
       const tasks = study.trials.flatMap(t => role==='mission' ? t.planners : t.worker ? [t.worker] : []);
       const prior = tasks.at(-1);
       const requestId = ['mission',study.missionId,trial.number,role,a.id,trial.planners.length].join(':');
+      if(reconnect){
+        const receipts=this.#storage.records<ProcessRow>('process',a.sessionId).filter(p=>p.attemptId===reconnect.attemptId);
+        const completed=this.#storage.records<ArtifactRow>('artifact',a.sessionId).filter(row=>row.attemptId===reconnect.attemptId);
+        prompt+='\nContinue this same trial after the interrupted assignment. Reuse completed work. '+
+          'Resume at the missing call. Your published artifacts: '+JSON.stringify(completed.slice(-32).map(row=>({id:row.id,name:row.file.name})))+
+          '\nPrior process receipts: '+JSON.stringify(receipts.slice(-32).map(p=>({id:p.id,tool:p.job.externalMcp?.tool,
+            argumentDigest:p.job.externalMcp?.argumentDigest,status:p.status,externalFailure:p.job.externalFailure})));
+      }
       const assignment = prior ? {taskId:prior.taskId,message:prompt} :
         {title:role==='mission'?'Plan experiment trials':'Run experiment trials',prompt};
       const accepted = await this.#dispatch(a,prior?'send_to_agent':'spawn_agent',requestId,{
@@ -438,9 +454,13 @@ export class TaskManager implements AthenaTaskManager {
       },signal,next=>{
         const receipt = {coordinatorAttemptId:a.id,taskId:next.taskId,attemptId:next.id};
         if (role==='mission') trial.planners.push(receipt);
-        else trial.worker=receipt;
+        else {
+          if(reconnect)(trial.priorWorkers??=[]).push(reconnect);
+          delete trial.reconnectWorker;
+          trial.worker=receipt;
+        }
         this.#storage.set('experiment.mission:'+a.runId,study);
-      },!!prior && a.requestId.startsWith('resume:'),role);
+      },!!prior && a.requestId.startsWith('resume:'),role,reconnect?.attemptId);
       ref={coordinatorAttemptId:a.id,taskId:accepted.taskId,attemptId:accepted.attemptId};
     }
     if (pending(this.#child(a,ref.taskId).status)) await this.#wait(a,[ref.taskId],signal);
@@ -452,16 +472,20 @@ export class TaskManager implements AthenaTaskManager {
   }
 
   async #measureTrial(a:Attempt,study:ExperimentMission,trial:MissionTrial,worker:Attempt,signal:AbortSignal):Promise<NonNullable<MissionTrial['outcome']>> {
-    if (worker.status!=='succeeded') return {error:worker.error || 'Experiment worker '+worker.status};
     const {contract}=study;
+    const producerIds=new Set([worker.id,...(trial.priorWorkers??[]).map(ref=>ref.attemptId)]);
     const outputs=this.#storage.records<ArtifactRow>('artifact',a.sessionId).filter(row=>
-      row.runId===a.runId && row.taskId===worker.taskId && row.attemptId===worker.id && row.file.name===contract.resultFile);
-    if (outputs.length!==1) return {error:'Expected one '+contract.resultFile+' from this attempt, found '+outputs.length+'.'};
-    const row=outputs[0]!;
-    const invocation=this.#storage.record<ProcessRow>('process',row.processId)?.job.externalMcp;
+      row.runId===a.runId && row.taskId===worker.taskId && producerIds.has(row.attemptId) && row.file.name===contract.resultFile);
     const binding=contract.measurementTool;
-    if (binding && (invocation?.serverId!==binding.serverId || invocation.tool!==binding.tool))
-      return {error:'Artifact was produced outside the selected measurement tool.'};
+    const measured=binding?outputs.filter(row=>{
+      const invocation=this.#storage.record<ProcessRow>('process',row.processId)?.job.externalMcp;
+      return invocation?.serverId===binding.serverId && invocation.tool===binding.tool;
+    }):outputs;
+    // A settled process can have published the result before its Pi worker disconnected.
+    if(!measured.length && worker.status!=='succeeded')return {error:worker.error || 'Experiment worker '+worker.status};
+    if(!measured.length && outputs.length)return {error:'Artifact was produced outside the selected measurement tool.'};
+    if(measured.length!==1)return {error:'Expected one '+contract.resultFile+' from this trial, found '+measured.length+'.'};
+    const row=measured[0]!;
     const artifact=await this.#researchTarget(context(a),{kind:'artifact',id:row.id});
     const bytes=await this.#readArtifact(row);
     let value:number;
@@ -534,8 +558,29 @@ export class TaskManager implements AthenaTaskManager {
           JSON.stringify(contract)+'\nExperiment instruction: '+decision.instruction+
           '\nPublish the actual output using the agreed measurement method. Report any failure or concern about the method in your final response.',grants,signal);
         if (worker.status==='cancelled' && !(a.requestId.startsWith('resume:') && trial.worker?.coordinatorAttemptId!==a.id)) {study.status='stopped';study.reason='The experiment worker was stopped.';break;}
-        if(worker.result)trial.workerNote=worker.result.slice(0,600);
-        trial.outcome=await this.#measureTrial(a,study,trial,worker,signal);
+        const note=worker.result??worker.error;
+        if(note)trial.workerNote=note.slice(0,600);
+        const outcome=await this.#measureTrial(a,study,trial,worker,signal);
+        if('error' in outcome){
+          const processes=this.#storage.records<ProcessRow>('process',a.sessionId).filter(p=>p.attemptId===worker.id);
+          const confirmed=this.#storage.get<string[]>('research.confirmed:'+a.runId)??[];
+          const connection=recoveryConnections(processes,confirmed);
+          if(connection.blocked)throw new Error('Trial '+trial.number+': '+connection.blocked);
+          const unavailable=connection.unavailable?.at(-1);
+          if(unavailable){
+            trial.reconnectWorker=worker.id;
+            throw new Error('Trial '+trial.number+' paused on '+unavailable.job.externalMcp!.tool+': '+
+              (unavailable.job.error??unavailable.job.externalFailure));
+          }
+          // An operator can reconcile uncertain remote effects. Without a published
+          // measurement the trial remains unmeasured, and its call is never replayed.
+          if(processes.some(p=>confirmed.includes(p.id)))outcome.error='The remote outcome was checked. '+outcome.error;
+          if(worker.status!=='succeeded' && !processes.length){
+            trial.reconnectWorker=worker.id;
+            throw new Error('Trial '+trial.number+' stopped before any program was started: '+outcome.error);
+          }
+        }
+        trial.outcome=outcome;
         signal.throwIfAborted();
         checkpoint();
       }
@@ -558,9 +603,11 @@ export class TaskManager implements AthenaTaskManager {
       if(flow.handoff!==fingerprint)throw new ManagerError('REQUEST_ID_CONFLICT','A different handoff was already saved.');
       return {documentId:flow.documentId};
     }
-    const review=this.#research.snapshot(a).reviews.find(r=>r.id===args.reviewId&&r.requestedBy.runId===a.runId);
-    if(review?.state!=='completed'||review.executionStatus!=='succeeded'||review.verdict!=='supported')
-      throw new ManagerError('REVIEW_REQUIRED','Join a successful independent review of these experiment outputs first.');
+    const latestReview=()=>this.#research.snapshot(a).reviews.findLast(r=>r.requestedBy.runId===a.runId);
+    const review=latestReview();
+    if(review?.id!==args.reviewId||!review||review.state!=='completed'||review.executionStatus!=='succeeded'||review.verdict!=='supported')
+      throw new ManagerError('REVIEW_REQUIRED','Join a successful independent review covering the outstanding criteria and selected experiment outputs.');
+    const correction=flow.evidenceRevisions?.at(-1);
     const visited=flow.pages??[], selected=args.pageSourceIds;
     if(selected!==undefined && (!Array.isArray(selected)||selected.length>6||new Set(selected).size!==selected.length||
       selected.some(id=>typeof id!=='string'||!visited.some(page=>page.sourceId===id))))
@@ -570,11 +617,12 @@ export class TaskManager implements AthenaTaskManager {
     const attached=attachments.find(f=>f?.name===args.template);
     const layout=attached?readTemplate(this.#upload(a,attached.id).bytes.toString('utf8')):undefined;
     const style=layout?.style??template(args.template),outline=headings(args.outline);
-    if(!Array.isArray(args.artifactIds)||!args.artifactIds.length||args.artifactIds.length>8)throw Error('Select one to eight reviewed experiment outputs.');
+    const artifactIds=args.artifactIds;
+    if(!Array.isArray(artifactIds)||!artifactIds.length||artifactIds.length>8)throw Error('Select one to eight reviewed experiment outputs.');
     const evidence=[];
     const tables:NonNullable<NonNullable<Paper['workflow']>['tables']>=[];
     const upstreamPages=new Set(visited.map(p=>this.#papers.source(a.projectId,p.sourceId).origin).flatMap(o=>o&&'kind' in o?[o.id]:[]));
-    for(const id of args.artifactIds) {
+    for(const id of artifactIds) {
       const target=await this.#researchTarget(a,{kind:'artifact',id:text(id,'Artifact ID')});
       if(!review.targets.some(t=>canonical(t)===canonical(target)))throw Error('The review does not cover this exact artifact.');
       if(upstreamPages.has(target.id)&&!flow.tables?.some(t=>t.artifactId===target.id))throw Error('A cited page alone is not an experiment output.');
@@ -619,6 +667,12 @@ export class TaskManager implements AthenaTaskManager {
       if(!origin||!('provider' in origin))throw Error('Expected a Crossref source.');
       return {url:'https://doi.org/'+origin.providerId,retrievedAt:origin.retrievedAt,coverage:origin.hasAbstract?'metadata and abstract':'metadata',...c};
     });
+    if(latestReview()?.id!==review.id)throw new ManagerError('REVIEW_REQUIRED','A newer evidence review must settle before manuscript handoff.');
+    if(correction && (review.createdAt<correction.returnedAt || !review.targets.some(target=>{
+      if(target.kind!=='artifact'||!artifactIds.includes(target.id)||!target.processId)return false;
+      const process=this.#storage.record<ProcessRow>('process',target.processId);
+      return process?.runId===a.runId && process.status==='succeeded' && (process.job.startedAt??-1)>=correction.returnedAt;
+    })))throw new ManagerError('NEW_EVIDENCE_REQUIRED','The manuscript review requires a newly collected and independently reviewed result for the missing evidence.');
     const d=this.#papers.create(a.projectId,{title:args.title,goal:flow.input.slice(0,4096),outline,evidence},
       {runId:a.runId,sessionId:a.sessionId,reviewId:review.id,template:style,tables,...(layout&&attached?{layout:{preamble:layout.preamble,name:attached.name,version:attached.versionId!}}:{}),references:[...pageRefs,...doiRefs,...retained]},
       doc=>this.#saveFlow({...this.#flow(a.runId)!,documentId:doc.id,handoff:fingerprint,citations:[...citations,...retained.map(r=>({sourceId:r.sourceId,claim:r.claim}))],inputs}));
@@ -636,29 +690,222 @@ export class TaskManager implements AthenaTaskManager {
     }
     return {...result,saved};
   }
-  #continueFlow(run:Run) {
-    const flow=this.#flow(run.id);
-    if(!flow?.documentId||run.status!=='succeeded'||run.cancellationRequested||this.#active!==run.sessionId)
-      throw new ManagerError('FLOW_BLOCKED','Resume from a successful verified experiment in its original conversation.');
-    return this.#startPaper(run.projectId,flow.documentId,{sessionId:run.sessionId,mode:'write',requestId:'workflow:'+run.id},run);
+  #autonomy(root:string) {return this.#storage.get<ResearchAutonomy>('research.autonomy:'+root);}
+  #saveAutonomy(root:string,state:ResearchAutonomy) {this.#storage.set('research.autonomy:'+root,state);}
+  #origin(run:Run) {
+    if(this.#flow(run.id))return run;
+    const document=this.#storage.get<string>('paper.run:'+run.id);
+    const workflow=document && this.#papers.paper(run.projectId,document).workflow;
+    if(workflow && workflow.sessionId===run.sessionId)return this.#storage.record<Run>('run',workflow.runId);
   }
-  async #resumeFlow(project:string,args:Record<string,unknown>) {
+  #wakeResearch() {
+    if(this.#closed || !this.#ready || this.#continuing)return;
+    clearTimeout(this.#continuationTimer);
+    let due:{root:Run;latest:Run;at:number}|undefined;
+    for(const session of this.#storage.sessions()){
+      const latest=this.#currentRun(session.id);
+      if(!latest || pending(latest.status))continue;
+      const root=this.#origin(latest),state=root && this.#autonomy(root.id);
+      if(!root || !state || !autonomous(state))continue;
+      const at=state.nextAttemptAt??(latest.endedAt??Date.now())+750;
+      if(!due || at<due.at)due={root,latest,at};
+    }
+    if(!due)return;
+    const {root,latest,at}=due;
+    const delay=Math.max(150,at-Date.now());
+    this.#continuationTimer=setTimeout(()=>{
+      if(this.#closed)return;
+      this.#continuing=this.#advanceResearch(root,latest).finally(()=>{
+        this.#continuing=undefined;
+        this.#wakeResearch();
+      });
+    },delay).unref();
+  }
+  async #advanceResearch(root:Run,latest:Run) {
+    const initial=this.#autonomy(root.id);
+    if(!initial || !autonomous(initial))return;
+    const task=this.#storage.record<TaskRow>('task',latest.taskId);
+    if(!task)return;
+    // A stop or newer accepted attempt can race asynchronous model or
+    // plugin setup. Check again inside the same transaction as admission.
+    const ownsCheckpoint=()=>!this.#closed &&
+      this.#currentRun(root.sessionId)?.id===latest.id && canonical(this.#autonomy(root.id))===canonical(initial) && this.#storage.record<TaskRow>('task',latest.taskId)?.attemptId===task.attemptId &&
+      !pending(this.#storage.record<Run>('run',latest.id)!.status);
+    if(!ownsCheckpoint() || this.#busy || this.#turns.size && [...this.#turns.values()].some(t=>t.attempt.agentSessionId===root.sessionId))return;
+    const update=(state:ResearchAutonomy['state'],reason:string,wait=false,uncertainProcessIds?:string[])=>{
+      if(!ownsCheckpoint())return;
+      const failures=(initial.failures??0)+1;
+      const nextAttemptAt=wait?Date.now()+Math.min(60000,1000*2**Math.min(6,failures-1)):undefined;
+      this.#commit(()=>this.#saveAutonomy(root.id,{...initial,state,reason,failures,nextAttemptAt,uncertainProcessIds}));
+    };
+    let reason='The coordinator is assigning unfinished work from the saved plan.';
+    const recordAdmission=(count:boolean)=>{
+      if(!ownsCheckpoint())throw new ManagerError('CHECKPOINT_UNAVAILABLE','The research checkpoint changed.');
+      this.#saveAutonomy(root.id,{...initial,state:'recovering',reason,attempts:initial.attempts+Number(count),failures:0,nextAttemptAt:undefined});
+    };
+    try {
+      if(latest.cancellationRequested || latest.status==='cancelled'){
+        update('stopped','Research stopped. The saved results are available.');return;
+      }
+      const flow=this.#flow(root.id)!;
+      const paper=flow.documentId?this.#papers.paper(root.projectId,flow.documentId):undefined;
+      const writing=paper?.runs.findLast(r=>r.mode==='write' && r.context.sessionId===root.sessionId);
+      const decision=paper&&writing?await this.#papers.recovery(paper,writing):undefined;
+      if(decision?.action==='complete'){
+        update('completed','The independently approved manuscript has a compiled PDF.');return;
+      }
+      if(decision?.action==='wait'){
+        update(decision.poll?'waiting':'blocked',decision.reason,decision.poll);return;
+      }
+      const handoff=paper && !writing && latest.id===root.id;
+      if(!handoff && initial.attempts>=initial.limit){
+        update('blocked','The automatic recovery limit was reached. Inspect the latest findings and resume the saved checkpoint to authorize further work.');return;
+      }
+      if(!this.#executionEnabled(root.projectId)){
+        update('waiting','Waiting for project execution access to be restored.',true);return;
+      }
+      const rows=this.#storage.records<ProcessRow>('process',root.sessionId).filter(r=>r.runId===latest.id);
+      const connectivity=recoveryConnections(rows,this.#storage.get<string[]>('research.confirmed:'+root.id));
+      if(connectivity.blocked){update('blocked',connectivity.blocked,false,connectivity.uncertainProcessIds);return;}
+      for(const row of connectivity.unavailable??[]){
+        const reference=row.job.externalMcp!;
+        const pin=this.#runExtensions(task).servers.find(s=>s.id===reference.serverId && s.verification.digest===reference.verificationDigest);
+        if(!pin){update('blocked','Restore the original verified plugin '+reference.serverId+' to resume.');return;}
+        let token:string|undefined;
+        try {
+          token=await this.#externalToken(pin.verification.credentialRef);
+          await probePinnedExternalMcp(pin.definition,pin.verification,{token,signal:this.#shutdown.signal});
+        } catch(error){
+          const transient=isTransientExternalConnectionError(error);
+          const detail=error instanceof Error?error.message:'Connection check failed.';
+          update(transient?'waiting':'blocked',(transient?'Waiting for ':'Check the settings for ')+pin.definition.name+'. '+
+            (token?detail.replaceAll(token,'[redacted]'):detail),transient);
+          return;
+        }
+      }
+      if(!ownsCheckpoint())return;
+      const admit=()=>recordAdmission(true);
+      if(handoff){
+        reason='The verified experiment is ready for manuscript writing.';
+        await this.#continueFlow(latest,()=>recordAdmission(false));
+      }else if(paper && writing && decision?.action==='revise'){
+        reason='The editor is addressing the independent review of '+decision.version+'.';
+        await this.#startPaper(root.projectId,paper.id,{sessionId:root.sessionId,mode:'write',
+          expectedBaseVersion:decision.version,requestId:'review:'+decision.reviewId},root,admit);
+      }else if(paper && writing && decision?.action==='evidence'){
+        reason='The coordinator is gathering evidence requested by the manuscript reviewer.';
+        await this.#resumeEvidence(root,paper,writing,decision,admit);
+      }else{
+        if(writing)reason='The manuscript coordinator is resuming the saved edition.';
+        await this.#resumeFlow(root.projectId,{runId:root.id,expectedAttemptId:task.attemptId},undefined,admit,true);
+      }
+    }catch(error){
+      if(!ownsCheckpoint())return;
+      if(error instanceof ManagerError && ['RUN_BUSY','SESSION_BUSY','SESSION_MISMATCH'].includes(error.code))return;
+      const transient=isTransientExternalConnectionError(error) && (initial.failures??0)<initial.limit;
+      update(transient?'waiting':'blocked',error instanceof Error?error.message:'Could not resume the research checkpoint.',transient);
+    }
+  }
+  async #manualContinuation(project:string,args:Record<string,unknown>) {
+    const id=text(args.runId,'Research run'),expected=text(args.expectedAttemptId,'Checkpoint attempt');
+    const root=this.#storage.record<Run>('run',id),flow=this.#flow(id);
+    if(!root || !flow || root.projectId!==project || this.#active!==root.sessionId)
+      throw new ManagerError('CHECKPOINT_UNAVAILABLE','Open the owning research conversation.');
+    const key='research.manual:'+id+':'+expected,prior=this.#storage.get(key);
+    if(prior)return prior;
+    const latest=this.#currentRun(root.sessionId),task=latest && this.#storage.record<TaskRow>('task',latest.taskId);
+    if(!latest || !task || this.#origin(latest)?.id!==id || task.attemptId!==expected || pending(latest.status))
+      throw new ManagerError('CHECKPOINT_UNAVAILABLE','The checkpoint changed. Refresh research progress.');
+    const observed=this.#autonomy(id);
+    const confirmed=this.#storage.get<string[]>('research.confirmed:'+id)??[];
+    const processes=this.#storage.records<ProcessRow>('process',root.sessionId).filter(r=>r.runId===latest.id);
+    const {uncertainProcessIds}=recoveryConnections(processes,confirmed);
+    if(uncertainProcessIds && canonical(uncertainProcessIds)!==canonical(args.confirmedProcessIds))
+      throw new ManagerError('CHECKPOINT_UNAVAILABLE','Confirm the recorded remote outcomes before resuming.');
+    const admit:ContinuationAdmission=receipt=>{
+      if(this.#closed || this.#active!==root.sessionId || this.#currentRun(root.sessionId)?.id!==latest.id ||
+        this.#storage.record<TaskRow>('task',latest.taskId)?.attemptId!==expected || canonical(this.#autonomy(id))!==canonical(observed))
+        throw new ManagerError('CHECKPOINT_UNAVAILABLE','Research changed before the manual resume was admitted.');
+      this.#saveAutonomy(id,newAutonomy());
+      this.#storage.set(key,receipt);
+      if(uncertainProcessIds)this.#storage.set('research.confirmed:'+id,[...confirmed,...uncertainProcessIds]);
+    };
+    const paper=flow.documentId?this.#papers.paper(project,flow.documentId):undefined;
+    const writing=paper?.runs.findLast(r=>r.mode==='write' && r.context.sessionId===root.sessionId);
+    const decision=paper && writing && await this.#papers.recovery(paper,writing);
+    let accepted:unknown;
+    if(paper && writing && decision?.action==='evidence')
+      accepted=await this.#resumeEvidence(root,paper,writing,decision,admit);
+    else if(paper && writing && decision?.action==='revise')
+      accepted=await this.#startPaper(project,paper.id,{sessionId:root.sessionId,mode:'write',
+        expectedBaseVersion:decision.version,requestId:'review:'+decision.reviewId},root,admit);
+    else if(decision?.action==='wait'||decision?.action==='complete')
+      throw new ManagerError('CHECKPOINT_UNAVAILABLE',decision.action==='wait'?decision.reason:'This edition already has a compiled PDF.');
+    else accepted=await this.#resumeFlow(project,args,undefined,admit);
+    return this.#storage.get(key)??accepted;
+  }
+  async #stopResearch(project:string,session:string,runId:string) {
+    const root=this.#storage.record<Run>('run',runId),latest=this.#currentRun(session);
+    const state=this.#autonomy(runId);
+    if(!state || !root || root.projectId!==project || root.sessionId!==session || session!==this.#active ||
+        !latest || this.#origin(latest)?.id!==root.id)
+      throw new ManagerError('CHECKPOINT_UNAVAILABLE','Open the current research conversation first.');
+    if(state.state==='completed')return {state:state.state};
+    this.#commit(()=>this.#saveAutonomy(root.id,{...state,state:'stopped',reason:'Research stopped by the user.',nextAttemptAt:undefined}));
+    if(pending(latest.status))await this.cancelRun(latest.id);
+    return {state:'stopped'};
+  }
+  #continueFlow(run:Run,admit?:ContinuationAdmission) {
+    const flow=this.#flow(run.id);
+    if(!flow?.documentId || pending(run.status))
+      throw new ManagerError('FLOW_BLOCKED','Wait for a settled experiment with a verified manuscript handoff.');
+    const paper=this.#papers.paper(run.projectId,flow.documentId);
+    const review=this.#research.snapshot(run).reviews.findLast(r=>r.requestedBy.runId===run.id);
+    if(paper.workflow?.runId!==run.id || paper.workflow.sessionId!==run.sessionId ||
+        !review || review.id!==paper.workflow.reviewId || review.verdict!=='supported' ||
+        review.state!=='completed' || review.executionStatus!=='succeeded')
+      throw new ManagerError('REVIEW_REQUIRED','The manuscript handoff needs a current independent review of its experiment.');
+    return this.#startPaper(run.projectId,flow.documentId,{sessionId:run.sessionId,mode:'write',requestId:'workflow:'+run.id},run,admit);
+  }
+  #resumeEvidence(origin:Run,paper:Paper,writing:PaperRun,decision:{version:string;reviewId:string;reason:string},admit?:ContinuationAdmission) {
+    const task=this.#storage.record<TaskRow>('task',origin.taskId);
+    if(!task)throw new ManagerError('CHECKPOINT_UNAVAILABLE','The original research assignment is unavailable.');
+    const revision={version:decision.version,reviewId:decision.reviewId,reason:decision.reason,documentId:paper.id,paperRunId:writing.id,returnedAt:Date.now()};
+    return this.#resumeFlow(origin.projectId,{runId:origin.id,expectedAttemptId:task.attemptId},revision,admit,true);
+  }
+  async #resumeFlow(project:string,args:Record<string,unknown>,evidenceReturn?:EvidenceRevision,admit?:ContinuationAdmission,background=false) {
     this.#assertReady();
     const flowRun=this.#storage.record<Run>('run',text(args.runId,'Research run'));
-    if(!flowRun||flowRun.projectId!==project||flowRun.sessionId!==this.#active)throw new ManagerError('CHECKPOINT_UNAVAILABLE','Open the owning conversation first.');
-    const flow=this.#flow(flowRun.id);
+    if(!flowRun||flowRun.projectId!==project||(!background && flowRun.sessionId!==this.#active))throw new ManagerError('CHECKPOINT_UNAVAILABLE','Open the owning conversation first.');
+    let flow=this.#flow(flowRun.id);
     if(!flow)throw new ManagerError('CHECKPOINT_UNAVAILABLE','No research workflow for this request.');
+    const validateEvidenceReturn=(entry:EvidenceRevision)=>{
+      const original=this.#flow(flowRun.id);
+      const rejected=this.#papers.paper(project,entry.documentId);
+      const version=this.#papers.version(project,rejected.id,entry.version),review=version.assessment;
+      const writing=rejected.runs.findLast(r=>r.mode==='write' && r.context.sessionId===flowRun.sessionId);
+      if(original?.documentId!==rejected.id || rejected.workflow?.runId!==flowRun.id ||
+        rejected.workflow.sessionId!==flowRun.sessionId || writing?.id!==entry.paperRunId || writing.versions.at(-1)!==entry.version ||
+        version.currentVersion!==entry.version || review?.id!==entry.reviewId || review.verdict!=='insufficient_evidence' ||
+        !review.reviewer || this.#storage.record<Attempt>('attempt',review.reviewer.attemptId)?.status!=='succeeded' ||
+        this.#currentRun(flowRun.sessionId)?.id!==entry.paperRunId)
+        throw new ManagerError('CHECKPOINT_UNAVAILABLE','The reviewed evidence request changed.');
+    };
+    if(evidenceReturn){
+      validateEvidenceReturn(evidenceReturn);
+      flow={...flow,documentId:undefined,handoff:undefined,evidenceRevisions:[...(flow.evidenceRevisions??[]),evidenceReturn]};
+    }
     const paper=flow.documentId?this.#papers.paper(project,flow.documentId):undefined;
     const paperRun=paper?.runs.findLast(r=>r.mode==='write'&&r.context.sessionId===flowRun.sessionId);
-    if(paper&&!paperRun&&flowRun.status==='succeeded')return this.#continueFlow(flowRun);
+    if(paper&&!paperRun&&!pending(flowRun.status))return this.#continueFlow(flowRun,admit);
     const run=paperRun?this.#storage.record<Run>('run',paperRun.id):flowRun;
-    if(!run||run.id!==this.#currentRun(flowRun.sessionId)?.id)throw new ManagerError('CHECKPOINT_UNAVAILABLE','Only the latest request can resume.');
+    if(!run||(!evidenceReturn && run.id!==this.#currentRun(flowRun.sessionId)?.id))throw new ManagerError('CHECKPOINT_UNAVAILABLE','Only the latest request can resume.');
     const task=this.#storage.record<TaskRow>('task',run.taskId),previous=task&&this.#storage.record<Attempt>('attempt',task.attemptId);
     const expected=text(args.expectedAttemptId,'Checkpoint attempt');
-    const key='flow.resume:'+run.id+':'+expected;
+    const key=evidenceReturn?'flow.evidence:'+evidenceReturn.reviewId:'flow.resume:'+run.id+':'+expected;
     const accepted=this.#storage.get<{runId:string;attemptId:string}>(key);
     if(accepted)return accepted;
-    this.#assertIdle();
+    this.#assertIdle(run.sessionId);
     if(!previous||previous.id!==expected)throw new ManagerError('CHECKPOINT_UNAVAILABLE','The checkpoint changed. Refresh progress.');
     if(!this.#executionEnabled(project))throw new ManagerError('CHECKPOINT_UNAVAILABLE','Restore project analysis access first.');
     if(paper&&paperRun){
@@ -674,28 +921,47 @@ export class TaskManager implements AthenaTaskManager {
       for(const server of extensions.servers)await this.#externalToken(server.verification.credentialRef);
       const pin=run.model?.profileId&&this.#models?await this.#models.pin(run.model):undefined;
       const runtime=await this.#retryRuntime({...session,sessionId:session.id,role:'parent'},run.model,pin,true,extensions);
-      const held=this.#children(previous).map(t=>({taskId:t.id,title:t.title,status:t.status,artifactIds:t.artifactIds}));
-      const board=this.#research.snapshot(previous);
-      const adaptive=this.#experimentMission(run.id);
-      const prompt=paper?'Manuscript write request. Resume the saved manuscript checkpoints with compose_manuscript({}).':
-        'Continue this research request from the stored checkpoints. '+(flow.planMode && !board.missions.some(m=>m.runId===run.id)?'Create the missing plan with plan_research. ':'Use the existing plan. ')+
-        (adaptive?'Call run_experiment_mission with only missionId '+adaptive.missionId+' to reconcile its saved trials. ':'')+
-        'Reuse saved evidence, reviews and published artifacts. Do not repeat completed experiments. '+
-        'Use get_research_board and list_tasks. Retry only missing or failed work. Once a review supports the results call prepare_research_paper. Original request: '+flow.input+
-        '\nExisting tasks: '+JSON.stringify(held)+'\nMission IDs: '+JSON.stringify(board.missions.filter(m=>m.runId===run.id).map(m=>m.id));
-      const next=this.#attempt(context(previous),'resume:'+expected,prompt,previous.fileIds,run.model??undefined);
+      const prompt=paperRun?'Manuscript write request. Resume the saved manuscript checkpoints with compose_manuscript({}).':
+        this.#experimentRecoveryPrompt(flow,previous);
+      const next={...this.#attempt(context(previous),'resume:'+expected,prompt,previous.fileIds,run.model??undefined),researchContinuation:true as const,
+        ...(previous.explicitSkillIds?{explicitSkillIds:previous.explicitSkillIds}:{})};
       const response={runId:run.id,attemptId:next.id};
       this.#commit(()=>{
+        if(evidenceReturn)validateEvidenceReturn(evidenceReturn);
+        admit?.(response);
         this.#storage.putRecord('run',{...run,endedAt:null,status:'queued',error:undefined,cancellationRequested:false,recovery:undefined});
         this.#journal.accept(next,task!.title);
         if(paper&&paperRun){
           paperRun.context=context(next);paperRun.stage='requested';delete paperRun.error;this.#papers.put(paper);
         }
-        this.#saveFlow({...flow,error:undefined});this.#storage.set(key,response);
+        const currentFlow=this.#flow(flowRun.id)!;
+        this.#saveFlow({...currentFlow,...(evidenceReturn?{documentId:undefined,handoff:undefined,evidenceRevisions:flow!.evidenceRevisions}:{}),error:undefined});
+        this.#storage.set(key,response);
       });
       if(pin)this.#pins.set(run.id,pin);
       this.#schedule(next,runtime);return response;
     }finally{this.#busy=false;}
+  }
+  #experimentRecoveryPrompt(flow:ResearchFlow, previous:Attempt) {
+    const board=this.#research.snapshot(previous);
+    const mission=board.missions.findLast(m=>m.runId===flow.runId);
+    const review=board.reviews.findLast(r=>r.requestedBy.runId===flow.runId);
+    const adaptive=this.#experimentMission(flow.runId);
+    const held=this.#children(previous).map(t=>({taskId:t.id,title:t.title,status:t.status,artifactIds:t.artifactIds}));
+    const evidence=board.evidence.filter(e=>e.createdBy.runId===flow.runId).map(e=>({id:e.id,missionId:e.missionId,title:e.title}));
+    const rejectedPaper=flow.evidenceRevisions?.at(-1);
+    return [
+      'Continue this research request from the stored checkpoints. Use get_research_board and list_tasks to inspect the complete original request, plan, evidence, tool receipts and independent reviews.',
+      mission?'Use the existing plan '+mission.id+' and its acceptance criteria.':'Create the missing plan with plan_research.',
+      adaptive?'Call run_experiment_mission with only missionId '+adaptive.missionId+' to inspect or reconcile saved trials. Respect the frozen trial budget and protocol.':'',
+      'Reuse published bytes and completed experiments. Act on the next unmet criterion. For an interrupted tool call inspect its receipt first. An unknown external outcome requires reconciliation before repeating the action.',
+      review?'Most recent evidence review '+JSON.stringify({id:review.id,missionId:review.missionId,state:review.state,verdict:review.verdict,findings:review.findings}).slice(0,4000):'Independent evidence review is still needed.',
+      rejectedPaper?'Manuscript '+rejectedPaper.version+' requires new evidence. Review '+rejectedPaper.reviewId+': '+rejectedPaper.reason:'',
+      'Resolve each outstanding finding by collecting or correcting the missing evidence, then request fresh independent review of the exact results against the original goal. Use a supported review for prepare_research_paper. Perform the work now within the authorized scope.',
+      'Original request: '+flow.input.slice(0,8000),
+      'Saved evidence: '+JSON.stringify(evidence.slice(-32)).slice(0,4000),
+      'Existing tasks: '+JSON.stringify(held).slice(0,8000),
+    ].filter(Boolean).join('\n');
   }
   #flowReport(project:string,session:string,selected?:unknown) {
     if(session!==this.#active||this.#session(session).projectId!==project)throw new ManagerError('SESSION_MISMATCH','Open the owning research conversation.');
@@ -719,7 +985,7 @@ export class TaskManager implements AthenaTaskManager {
     const artifacts=this.#storage.records<ArtifactRow>('artifact',session).filter(f=>f.runId===run.id);
     const searches=this.#bibliography.list(project,session).filter(s=>flow.searchIds.includes(s.id));
     const retained=paper?.workflow?.references?.filter(ref=>flow.citations?.some(c=>c.sourceId===ref.sourceId))??[];
-    const succeeded=reviews.findLast(r=>r.verdict==='supported'&&r.executionStatus==='succeeded');
+    const verification=reviews.at(-1);
     const states=(status:string|undefined)=>status==='cancelled'||status==='paused'||status==='interrupted'?'Stopped':status==='failed'||status==='timed_out'?'Failed':
       status==='running'||status==='queued'||status==='blocked'?'Running':'Waiting for input';
     const upcoming=pending(run.status)?'Planned':states(run.status);
@@ -789,13 +1055,21 @@ export class TaskManager implements AthenaTaskManager {
       phase('Sources',flow.pages?.length||flow.inputs?.length||retained.length?'Succeeded':searches.some(s=>s.records.length)?'Succeeded':searches.length?states(searches[0]?.status):upcoming,run.taskId,
         [...(flow.inputs??[]).map(p=>p.title+' · supplied input'),...[...(flow.pages??[]),...retained].map(p=>[p.url,p.retrievedAt,p.coverage,p.claim].join(' · ')),...searches.map(s=>[s.term,s.status,s.error,...s.records.map(r=>r.doi+' · '+r.level+' · '+r.retrievedAt)].filter(Boolean).join(' · '))].join('\n')),
       experimentStage(),
-      phase('Verify results',succeeded?'Succeeded':reviews.length?states(reviews.at(-1)?.executionStatus):upcoming,reviews.at(-1)?.reviewer?.taskId,reviews.at(-1)?.verdict),
+      phase('Verify results',verification?.verdict==='supported'&&verification.executionStatus==='succeeded'?'Succeeded':verification?states(verification.executionStatus):upcoming,verification?.reviewer?.taskId,verification?.verdict==='supported'?verification.verdict:[verification?.verdict,...(verification?.findings??[])].filter(Boolean).join(' · ')),
       phase('Manuscript',editing?'Running':revisionRecovery?states(writing?.stage==='failed'?'failed':written?.status):current?'Succeeded':written?states(written.status):paper?'Waiting for input':'Planned',editorTask,writing?.error||flow.error),
       phase('Independent review',reviewing?'Running':editing?'Planned':version?.review.status==='approved'?'Succeeded':version?.assessment?'Waiting for input':'Planned',
         reviewing?writing.attempts.at(-1)?.taskId:version?.assessment?.reviewer?.taskId,editing||reviewing?undefined:version?.assessment?.verdict),
       phase('LaTeX',version?.compilation?.state==='succeeded'?'Succeeded':version?.compilation?.state==='stopped'?'Stopped':version?.compilation?states(version.compilation.state):'Planned',written?.taskId,version?.compilation?.error)
     ];
-    return {revisionRecovery,history:history.map(r=>({runId:r.id,title:r.title})),checkpoint,runId:run.id,model:run.model,documentId:paper?.id,manuscriptRunId:writing?.id,version:current,
+    const control=this.#autonomy(run.id);
+    const autonomy=control && (!isLatest && autonomous(control)
+      ? {...control,state:'stopped',reason:'A newer request owns this conversation.',canStop:false,nextAttemptAt:undefined}
+      : {...control,canStop:isLatest && autonomous(control)});
+    const editionMatches=!writing||(current??null)===(writing.versions.at(-1)??writing.baseVersion);
+    const canResume=!pending(latest.status) && isLatest && editionMatches && (control?.state==='blocked' ||
+      !paper || !writing || unfinishedRevision || version?.assessment?.verdict==='insufficient_evidence' ||
+      !version?.assessment && writing.stage!=='insufficient_evidence' || writing.stage==='failed' && version?.review.status!=='approved');
+    return {autonomy,revisionRecovery,evidenceRevisions:flow.evidenceRevisions,history:history.map(r=>({runId:r.id,title:r.title})),checkpoint,runId:run.id,model:run.model,documentId:paper?.id,manuscriptRunId:writing?.id,version:current,
       plan:mission && {missionId:mission.id, objective:mission.objective, stages:mission.stages, acceptanceCriteria:mission.acceptanceCriteria,
         coordinatorModel:flow.planMode ? run.model?.modelId : undefined},
       liveDraft:draft && (!current||drafting && pending(drafting.status))?{...draft,active:!!drafting && pending(drafting.status)}:undefined,
@@ -817,9 +1091,9 @@ export class TaskManager implements AthenaTaskManager {
         return {...passage,unresolved:true};
       }),
       connections:run.extensions?.servers.map(s=>({name:s.definition.name,capability:s.definition.capability,checkedAt:s.verification.checkedAt,calls:processes.filter(p=>p.job.externalMcp?.serverId===s.id).map(p=>({tool:p.job.externalMcp!.tool,status:p.status})),tools:s.verification.tools.map(t=>t.name)}))??[],
-      searches:searches.map(s=>({status:s.status,term:s.term})),canResume:!pending(latest.status)&&isLatest&&(!writing||(current??null)===(writing.versions.at(-1)??writing.baseVersion))&&(!paper||!writing||unfinishedRevision||(!version?.assessment&&writing.stage!=='insufficient_evidence')||writing.stage==='failed'&&version?.review.status!=='approved'),error:flow.error??latest.error};
+      searches:searches.map(s=>({status:s.status,term:s.term})),canResume,error:flow.error??latest.error};
   }
-  paperCatalog(project:string) { this.#paperProject(project); return this.#papers.list(project); }
+  paperCatalog(project:string) { this.#paperProject(project); return {...this.#papers.list(project),library:this.#library.catalog(project,this.#active!)}; }
   #paperProject(project:string) {
     if(!this.#active||this.#session(this.#active).projectId!==project) throw new ManagerError('PROJECT_MISMATCH','Open the project conversation first.');
     this.#assertReady();
@@ -862,7 +1136,8 @@ export class TaskManager implements AthenaTaskManager {
       });
       return {result:artifactRef(row.file),taskId:row.taskId,inputs};
     }
-    if(method==='resumeResearch')return this.#resumeFlow(project,args);
+    if(method==='stopResearch')return this.#stopResearch(project,text(args.sessionId,'Conversation'),text(args.runId,'Research run'));
+    if(method==='resumeResearch')return this.#manualContinuation(project,args);
     if(method==='listPapers')return this.paperCatalog(project);
     if(method==='createPaper')return this.#papers.create(project,args);
     if(method==='addPaperSource') {
@@ -902,8 +1177,14 @@ export class TaskManager implements AthenaTaskManager {
     if(method!=='startPaper')throw new ManagerError('INVALID_INPUT','Unknown manuscript operation.');
     return this.#startPaper(project,id,args);
   }
-  async #startPaper(project:string,id:string,args:Record<string,unknown>,original?:Run) {
-    const sessionId=text(args.sessionId,'Conversation'),{session,runtime}=this.#bound(sessionId);
+  async #startPaper(project:string,id:string,args:Record<string,unknown>,original?:Run,admit?:ContinuationAdmission) {
+    const sessionId=text(args.sessionId,'Conversation');
+    // Internal paper handoffs use the originating conversation even while the
+    // user reads another one. Public RPCs must bind to the selected session.
+    const session=original?this.#session(sessionId):this.#bound(sessionId).session;
+    if(original && (original.projectId!==project || original.sessionId!==sessionId || this.#papers.paper(project,id).workflow?.runId!==original.id))
+      throw new ManagerError('SESSION_MISMATCH','Manuscript handoff is outside the research conversation.');
+    const runtime=await this.#openRoot(session,original?.extensions);
     if(session.projectId!==project)throw new ManagerError('PROJECT_MISMATCH','Wrong conversation for this manuscript.');
     const mode=args.mode;
     if(mode!=='outline'&&mode!=='write')throw new ManagerError('INVALID_INPUT','Select outlining or writing.');
@@ -914,8 +1195,14 @@ export class TaskManager implements AthenaTaskManager {
       if(old.mode!==mode||old.context.sessionId!==sessionId||(expected!==undefined&&old.baseVersion!==expected))throw new ManagerError('REQUEST_ID_CONFLICT','Start request changed.');
       return {runId:old.id};
     }
+    let typesettingRepair=false;
     if(expected!==undefined){
-      if(mode!=='write'||d.versions.at(-1)!==expected||this.#papers.version(project,id,expected).assessment?.verdict!=='changes_required')
+      if(mode!=='write'||d.versions.at(-1)!==expected)
+        throw new ManagerError('VERSION_CONFLICT','Open the latest revision with requested changes.');
+      const version=this.#papers.version(project,id,expected);
+      typesettingRepair=!!original && d.workflow?.runId===original.id && version.assessment?.verdict==='supported' &&
+        version.compilation?.state==='failed' && version.compilation.repair?.kind==='manuscript';
+      if(version.assessment?.verdict!=='changes_required'&&!typesettingRepair)
         throw new ManagerError('VERSION_CONFLICT','Open the latest revision with requested changes.');
       if(d.workflow){
         const origin=this.#storage.record<Run>('run',d.workflow.runId);
@@ -925,7 +1212,7 @@ export class TaskManager implements AthenaTaskManager {
       }
     }
     if(this.#paperStarting.has(sessionId))throw new ManagerError('RUN_BUSY','Manuscript start is in progress.');
-    this.#assertIdle();
+    this.#assertIdle(sessionId);
     if(!this.#executionEnabled(project))throw new ManagerError('EXECUTION_DISABLED','Enable offline analysis for this project before starting a manuscript.');
     if(mode==='write'&&(!d.outline.length||this.#maxChildren<3||!this.#depth))throw new ManagerError('PAPER_LIMIT','Writing needs an outline and capacity for three direct children.');
     if(d.runs.length>=32)throw new ManagerError('PAPER_LIMIT','Manuscript run limit reached.');
@@ -946,16 +1233,17 @@ export class TaskManager implements AthenaTaskManager {
       const base=d.versions.at(-1);
       const previous=mode==='write'&&base?this.#papers.version(project,id,base):undefined;
       const review=previous?.assessment;
-      if(previous && review?.verdict==='changes_required'){
+      if(previous && review && (review.verdict==='changes_required'||typesettingRepair)){
         if(!review.reviewer || this.#storage.record<Attempt>('attempt',review.reviewer.attemptId)?.status!=='succeeded')
           throw new ManagerError('PAPER_NO_REVIEW','The prior edition needs a completed independent review.');
         files.push(...manuscriptContextFiles('prior-manuscript.md',previous.text),
           ...manuscriptContextFiles('prior-review.json',JSON.stringify({version:previous.version,sha256:previous.sha256,
-            reviewId:review.id,verdict:review.verdict,checks:review.checks,findings:review.findings,linkIssues:previous.issues})));
+            reviewId:review.id,verdict:review.verdict,checks:review.checks,findings:review.findings,linkIssues:previous.issues,
+            ...(typesettingRepair?{typesettingError:previous.compilation?.error}:{})})));
       }
       const userBrief=d.workflow?.sessionId===sessionId?this.#flow(d.workflow.runId)?.input??d.goal:d.goal;
       if(mode==='write'&&JSON.stringify(userBrief).length>2048)files.push(...manuscriptContextFiles('user-research-brief.txt',userBrief));
-      const {fileReferences}=await this.stageFiles(sessionId,files);
+      const {fileReferences}=await this.#stageFiles(session,files);
       const flow=original&&this.#flow(original.id);
       const contextDraft=flow?.drafts.length?'\nSaved preliminary sections: '+JSON.stringify(flow.drafts.map(s=>s.heading)):'';
       const sourceDirectory=paperSourceDirectory(sources,fileReferences.map(f=>f.id),d,flow);
@@ -965,10 +1253,10 @@ export class TaskManager implements AthenaTaskManager {
         const current=this.#papers.paper(project,id);
         if(JSON.stringify([current.evidence,current.outline,current.versions])!==JSON.stringify([d.evidence,d.outline,d.versions]))throw new ManagerError('VERSION_CONFLICT','Manuscript changed during start.');
         current.runs.push({id:a.runId,requestId,mode,baseVersion:d.versions.at(-1)??null,context:context(a),stage:'requested',outline:[...d.outline],sections:[],
-          attempts:[],versions:[],reviews:[],...(review?.verdict==='changes_required'?{revisionReviewId:review.id}:{}),
+          attempts:[],versions:[],reviews:[],...(review && (review.verdict==='changes_required'||typesettingRepair)?{revisionReviewId:review.id,...(typesettingRepair?{typesettingRepair:true}:{})}:{}),
           contextFileIds:fileReferences.slice(sources.length).map(f=>f.id),uploads:fileReferences.slice(0,sources.length).map((f,i)=>({fileId:f.id,sourceId:sources[i]!.sourceId}))});
         this.#papers.put(current);this.#storage.set('paper.run:'+a.runId,id);
-      },original);
+      },original,admit);
       return response.data;
     } finally {this.#paperStarting.delete(sessionId);}
   }
@@ -991,7 +1279,9 @@ export class TaskManager implements AthenaTaskManager {
       (JSON.stringify(userBrief).length>2048 && contextFileIds.length?'read the granted user-research-brief.txt file(s).':JSON.stringify(userBrief).slice(0,2048));
     const revisionContext=paperRun.revisionReviewId?
       'Use read_file with each granted prior-manuscript.md and prior-review.json fileId (all parts). Previous edition '+paperRun.baseVersion+
-      ', independent review '+paperRun.revisionReviewId+'. Check each recorded finding and preserve supported material. These inputs describe the revision history and are not sources for empirical claims.':'';
+      ', independent review '+paperRun.revisionReviewId+'. Check each recorded finding and preserve supported material. '+
+      (paperRun.typesettingRepair?'Repair the source formatting described in typesettingError and preserve the approved scientific claims. ':'')+
+      'These inputs describe the revision history and are not sources for empirical claims.':'';
     const study=upstream && this.#experimentMission(upstream.runId);
     const measurements=study?.trials.flatMap(t=>{
       if (!t.outcome || !('value' in t.outcome)) return [];
@@ -1182,7 +1472,17 @@ export class TaskManager implements AthenaTaskManager {
     return { saved: true as const, snapshot: this.getSnapshot() };
   }
   #runs(sessionId: string): Run[] { return this.#storage.records<Run>('run', sessionId); }
-  #currentRun(sessionId: string): Run | undefined { return this.#runs(sessionId).at(-1); }
+  #currentRun(sessionId:string):Run|undefined {
+    const latest=this.#runs(sessionId).at(-1);
+    if(!latest)return;
+    const documentId=this.#storage.get<string>('paper.run:'+latest.id);
+    if(documentId){
+      const root=this.#papers.paper(latest.projectId,documentId).workflow?.runId;
+      if(root && this.#flow(root)?.evidenceRevisions?.at(-1)?.paperRunId===latest.id)
+        return this.#storage.record<Run>('run',root);
+    }
+    return latest;
+  }
 
   getSnapshot() {
     this.#assertReady();
@@ -1294,16 +1594,15 @@ export class TaskManager implements AthenaTaskManager {
 
   async openSession(sessionId: string): Promise<SessionActivation> {
     this.#assertReady();
-    if (this.#busy) throw new ManagerError('SESSION_BUSY','Another selection is in progress.');
-    const session = this.#session(sessionId);
-    if (this.#active !== sessionId) {
-      this.#busy = true;
-      try {
-        await this.#openRoot(session);
-        this.#active = session.id;
-        this.#commit(()=>{this.#storage.set('activeSession',sessionId);this.#storage.set('activeProject',session.projectId);});
-      } finally { this.#busy = false; }
+    const session=this.#session(sessionId),selection=++this.#selection;
+    await this.#openRoot(session);
+    this.#assertReady();
+    if(selection!==this.#selection)throw new ManagerError('SESSION_MISMATCH','A newer conversation was selected.');
+    if(this.#active!==sessionId){
+      this.#active=sessionId;
+      this.#commit(()=>{this.#storage.set('activeSession',sessionId);this.#storage.set('activeProject',session.projectId);});
     }
+    this.#wakeResearch();
     return {sessionId, projectId:session.projectId,title:session.title,snapshot:this.getSnapshot()};
   }
   #model(runtime: ManagedPiSession): ModelReference | null {
@@ -1338,7 +1637,10 @@ export class TaskManager implements AthenaTaskManager {
   }
 
   stageFiles(sessionId: string, files: readonly StagedFileInput[]): Promise<{ fileReferences: FileReference[] }> {
-    const { session } = this.#bound(sessionId);
+    return this.#stageFiles(this.#bound(sessionId).session,files);
+  }
+  #stageFiles(session:StoredSession,files:readonly StagedFileInput[]) {
+    const sessionId=session.id;
     if (!Array.isArray(files) || !files.length) throw new ManagerError('INVALID_FILES', 'Supply at least one file.');
     const prepared = files.map(file => {
       if (!object(file) || typeof file.name !== 'string' || !file.name.trim() || typeof file.mimeType !== 'string' ||
@@ -1404,6 +1706,13 @@ export class TaskManager implements AthenaTaskManager {
 
   #attachmentMessage(attempt: Attempt, runtime: ManagedPiSession): AttachmentMessage | undefined {
     if (attempt.parentTaskId !== null || attempt.kind === 'reconciliation') return;
+    // A typed host attempt, or its persisted acceptance receipt on earlier builds,
+    // distinguishes this prompt from identical text or IDs supplied by the user.
+    if (attempt.researchContinuation || (attempt.requestId.startsWith('resume:') &&
+      this.#storage.get<{attemptId:string}>('flow.resume:'+attempt.runId+':'+attempt.requestId.slice(7))?.attemptId===attempt.id)) {
+      return {dispatch:runtime.publicText?.(attempt.prompt)??attempt.prompt,researchContinuation:true,
+        user:'Athena continued from the saved plan, results and review findings.'};
+    }
     const manuscriptHandoff = Boolean(this.#storage.get<string>('paper.run:' + attempt.runId));
     if (!attempt.fileIds.length && !manuscriptHandoff) return;
     let suffix = '';
@@ -1424,7 +1733,7 @@ export class TaskManager implements AthenaTaskManager {
   }
 
   async pi(sessionId: string, command: PiCommand): Promise<unknown> {
-    const { session, runtime } = this.#bound(sessionId);
+    const { session, runtime } = this.#bound(sessionId,READ_COMMANDS.some(type=>type===command?.type));
     if (!object(command) || typeof command.type !== 'string') throw new ManagerError('INVALID_COMMAND', 'Pi command type is required.');
     switch (command.type) {
       case 'prompt': return this.#prompt(session, runtime, command);
@@ -1464,7 +1773,7 @@ export class TaskManager implements AthenaTaskManager {
     }
   }
 
-  async #prompt(session: StoredSession, runtime: ManagedPiSession, command: PiCommand, onAccept?:(a:Attempt)=>void, original?:Run): Promise<Response> {
+  async #prompt(session: StoredSession, runtime: ManagedPiSession, command: PiCommand, onAccept?:(a:Attempt)=>void, original?:Run, admit?:ContinuationAdmission): Promise<Response> {
     const requestId = text(command.id, 'Request ID');
     const fingerprint = hash(canonical(command));
     const previous = this.#storage.receipt(session.id, requestId);
@@ -1517,7 +1826,7 @@ export class TaskManager implements AthenaTaskManager {
           runtime.close();
           this.#registry.delete(runtime.sessionId);
           try {
-            runtime = await this.#make(session.projectId, session.sessionDir, 'parent', session.sessionFile, pin, extensions);
+            runtime = await this.#load({...session,sessionId:session.id,role:'parent'},pin,extensions);
             if (runtime.sessionId !== session.id) {
               this.#registry.delete(runtime.sessionId);
               runtime.close();
@@ -1549,9 +1858,13 @@ export class TaskManager implements AthenaTaskManager {
       ...(explicitSkillIds.length?{explicitSkillIds}:{})};
     const response=reply(command,{accepted:true,...context(a)});
     this.#commit(()=>{
+      admit?.({runId:run.id,attemptId:a.id});
       this.#storage.putRecord('run',{...run,agentSessionId:a.agentSessionId,attemptId:a.id});
       this.#journal.accept(a,run.title);onAccept?.(a);
-      if(first)this.#saveFlow({planMode:'coordinator',runId:run.id,input:String(command.message),fileIds,searchIds:[],drafts:[]});
+      if(first){
+        this.#saveFlow({planMode:'coordinator',runId:run.id,input:String(command.message),fileIds,searchIds:[],drafts:[]});
+        this.#saveAutonomy(run.id,newAutonomy());
+      }
       this.#storage.putReceipt({sessionId:session.id,requestId,fingerprint,state:'accepted',response});
     });
     if (pin) this.#pins.set(run.id, pin);
@@ -1682,13 +1995,15 @@ export class TaskManager implements AthenaTaskManager {
       this.#scheduler.release(a);this.#turns.delete(a.id);
       if(!a.parentTaskId&&!this.#closed){
         const flow=this.#flow(a.runId),run=this.#storage.record<Run>('run',a.runId);
-        if(flow?.documentId&&run?.status==='succeeded'&&!run.cancellationRequested){
+        if(flow?.documentId&&run?.status==='succeeded'&&!run.cancellationRequested&&!this.#autonomy(run.id)){
           try{await this.#continueFlow(run);}catch(error){
             if(!this.#closed)this.#commit(()=>this.#saveFlow({...flow,error:(error as Error).message}));
           }
         }
       }
-      if (!this.#closed && !pending(this.#storage.record<Run>('run',a.runId)?.status ?? 'ready')) this.#releasePins(a.runId);
+      if (!this.#closed && !pending(this.#storage.record<Run>('run',a.runId)?.status ?? 'ready')) {
+        this.#releasePins(a.runId);this.#wakeResearch();
+      }
     }
   }
   #children(a:Context) {return this.#storage.records<TaskRow>('task',a.sessionId).filter(t=>t.runId===a.runId && t.parentTaskId===a.taskId);}
@@ -1761,7 +2076,15 @@ export class TaskManager implements AthenaTaskManager {
     if (name === 'get_research_board') {
       const board=this.#research.snapshot({projectId:a.projectId,sessionId:a.sessionId,agentSessionId:a.agentSessionId});
       const study=!a.parentTaskId && this.#experimentMission(a.runId);
-      return study?{...board,experimentMission:{...study,...missionProgress(study)}}:board;
+      const flow=(!a.parentTaskId||a.workerRole==='verification')?this.#flow(a.runId):undefined;
+      const executionReceipts=flow && !a.parentTaskId?this.#storage.records<ProcessRow>('process',a.sessionId)
+        .filter(p=>p.runId===a.runId).slice(-64).map(p=>({
+          processId:p.id,taskId:p.taskId,attemptId:p.attemptId,status:p.status,program:p.job.program,
+          serverId:p.job.externalMcp?.serverId,tool:p.job.externalMcp?.tool,argumentDigest:p.job.externalMcp?.argumentDigest,
+          externalFailure:p.job.externalFailure,artifactIds:(p.job.artifacts??(p.job.artifact?[p.job.artifact]:[])).map(f=>f.id)
+        })):undefined;
+      return {...board,...(flow?{originalRequest:flow.input}:{}),...(executionReceipts?{executionReceipts}:{}),
+        ...(study?{experimentMission:{...study,...missionProgress(study)}}:{})};
     }
     if (name === 'load_skill') {
       if (Object.keys(args).some(key => !['id','reason','mode'].includes(key)) || args.mode !== undefined && args.mode !== 'automatic' && args.mode !== 'explicit') throw new ManagerError('INVALID_INPUT', 'Invalid skill selection.');
@@ -1805,12 +2128,25 @@ export class TaskManager implements AthenaTaskManager {
     this.#commit(()=>this.#journal.event(a,'research_updated','Research record saved.'));
     return result;
   }
-  #reviewPrompt(review: {id:string;missionId:string;question:string;targets:readonly ResearchTarget[];contextFiles?:readonly ResearchTarget[]}) {
+  #reviewPrompt(review: ResearchReview) {
+    const flow=this.#flow(review.requestedBy.runId);
+    let criteria='';
+    if(flow){
+      const board=this.#research.snapshot(review.requestedBy);
+      const plan=board.missions.find(m=>m.id===review.missionId);
+      const previous=board.reviews.slice(0,board.reviews.findIndex(r=>r.id===review.id)).findLast(r=>
+        r.requestedBy.runId===flow.runId && r.state==='completed' && r.executionStatus==='succeeded');
+      const paperReview=flow.evidenceRevisions?.at(-1);
+      criteria='\nAssess the complete original request and its acceptance criteria, including any missing validation identified in earlier reviews. '+
+        'Use get_research_board for the full originalRequest, criteria and findings. Mark missing required evidence insufficient_evidence. '+
+        JSON.stringify({originalRequest:flow.input.slice(0,1600),objective:plan?.objective,criteria:plan?.acceptanceCriteria,
+          unresolved:previous?.verdict==='supported'?undefined:previous?.findings,manuscriptFinding:paperReview?.reason}).slice(0,4200);
+    }
     return 'You are a fresh independent evidence reviewer. Begin with the original question and the exact evidence below. Assess the current deliverable on its own evidence. '
       + 'Inspect actual files, test the stated criteria, record failures and missing evidence. A separate session can still share model biases. '
       + 'When possible, independently reproduce the calculation using the granted original input and publish your own result. Use add_research_evidence with both the original fileIds and your own artifactIds; include its evidence ID in submit_review.reproductionEvidenceIds. '
       + 'Do not call a re-read of the author result a reproduction. Submit your supported, changes_required or insufficient_evidence verdict with submit_review; checks must describe work actually performed. '
-      + '\nReview assignment: ' + JSON.stringify({reviewId:review.id,missionId:review.missionId,question:review.question,targets:review.targets,...(review.contextFiles?{contextFiles:review.contextFiles}: {})});
+      + criteria + '\nReview assignment: ' + JSON.stringify({reviewId:review.id,missionId:review.missionId,question:review.question,targets:review.targets,...(review.contextFiles?{contextFiles:review.contextFiles}: {})});
   }
   async #operation(a:Attempt,name:string,raw:string,args:Readonly<Record<string,unknown>>,sdkSignal?:AbortSignal):Promise<unknown> {
     const turn=this.#turns.get(a.id);
@@ -1949,7 +2285,7 @@ export class TaskManager implements AthenaTaskManager {
       throw new ManagerError('RECOVERY_READ_ONLY', 'Manual recovery preserves completed work. The coordinator may only inspect child results and produce the final answer.');
     }
   }
-  async #dispatch(a:Attempt,name:'spawn_agent'|'send_to_agent',raw:string,args:Readonly<Record<string,unknown>>,signal:AbortSignal,onAccepted?:(attempt:Attempt)=>void,resumeChild=false,assignedRole?:WorkerRole):Promise<Accepted>{
+  async #dispatch(a:Attempt,name:'spawn_agent'|'send_to_agent',raw:string,args:Readonly<Record<string,unknown>>,signal:AbortSignal,onAccepted?:(attempt:Attempt)=>void,resumeChild=false,assignedRole?:WorkerRole,resumeFromAttemptId?:string):Promise<Accepted>{
     const requestId=text(args.requestId??raw,'Request ID');
     const id=hash(canonical([a.sessionId,a.runId,a.taskId,name,requestId]));
     const kind=name==='spawn_agent'?'spawn':'send';
@@ -1964,6 +2300,10 @@ export class TaskManager implements AthenaTaskManager {
     if (child && this.#retryTasks.has(child.id)) throw new ManagerError('TASK_RETRY_PENDING', 'A manual retry is being prepared for this child.');
     if(child && !assignedRole && this.#missionOwnsTask(child))throw new ManagerError('MISSION_OWNED','Continue this task through its experiment mission.');
     const previous=child?this.#storage.records<Attempt>('attempt',a.sessionId).filter(t=>t.taskId===child.id).at(-1):undefined;
+    if (resumeFromAttemptId && previous?.id !== resumeFromAttemptId) throw new ManagerError('CHECKPOINT_UNAVAILABLE','The interrupted worker assignment has changed.');
+    if (!assignedRole && previous && a.requestId.startsWith('resume:') && this.#flow(a.runId) &&
+        this.#storage.records<ProcessRow>('process',a.sessionId).some(p=>p.runId===a.runId && p.attemptId===previous.id && p.job.externalFailure==='connection'))
+      resumeFromAttemptId=previous.id;
     const select=(arg:unknown,fallback:readonly string[])=>{
       if(arg===undefined)return fallback;
       if(!Array.isArray(arg)||arg.length>32||new Set(arg).size!==arg.length||!arg.every((id:unknown):id is string=>typeof id==='string' && id.length>0))
@@ -2011,7 +2351,8 @@ export class TaskManager implements AthenaTaskManager {
     signal.throwIfAborted();
     this.#requireCoordinatorWrites(a);
     if (child && this.#retryTasks.has(child.id)) throw new ManagerError('TASK_RETRY_PENDING', 'A manual retry is being prepared for this child.');
-    const next={...this.#attempt({...context(a),taskId,parentTaskId:a.taskId,agentSessionId:runtime.sessionId},requestId,prompt,fileIds,model),artifactGrants,workerRole:role};
+    const next={...this.#attempt({...context(a),taskId,parentTaskId:a.taskId,agentSessionId:runtime.sessionId},requestId,prompt,fileIds,model),artifactGrants,workerRole:role,
+      ...(resumeFromAttemptId ? {resumeFromAttemptId} : {})};
     const response={taskId,parentTaskId:a.taskId,agentSessionId:runtime.sessionId,attemptId:next.id,status:next.status};
     this.#commit(()=>{
       if(!child)this.#storage.putRecord('agent_session',{projectId:a.projectId,sessionId:a.sessionId,id:runtime.sessionId,
@@ -2134,23 +2475,50 @@ export class TaskManager implements AthenaTaskManager {
       return {...diagnostics,artifacts};
     }finally{signal.removeEventListener('abort',cancel);}
   }
+  #recoveredExternalCall(a:Attempt,serverId:string,verificationDigest:string,tool:string,argumentDigest:string) {
+    if (!this.#flow(a.runId)) return;
+    const matches=this.#storage.records<ProcessRow>('process',a.sessionId).filter(row=>{
+      const call=row.job.externalMcp;
+      return row.runId===a.runId && row.projectId===a.projectId && call?.serverId===serverId &&
+        call.verificationDigest===verificationDigest && call.tool===tool && call.argumentDigest===argumentDigest;
+    });
+    if (matches.some(({job})=>job.externalFailure==='outcome_unknown' || (!job.externalFailure &&
+      (job.status==='interrupted' || (job.mcp?.phase==='tools/call' && ['failed','cancelled','timed_out'].includes(job.status))))))
+      throw new ManagerError('EXTERNAL_MCP_OUTCOME_UNKNOWN','The same external operation has an unconfirmed outcome. Reconcile it before repeating it.');
+    // Distinct experiment trials may intentionally repeat the same call. Reuse a
+    // success only in the host-recorded chain for the interrupted assignment.
+    const seen=new Set<string>();
+    let prevId=a.resumeFromAttemptId;
+    while (prevId && !seen.has(prevId)) {
+      seen.add(prevId);
+      const previous=this.#storage.record<Attempt>('attempt',prevId);
+      if (!previous || previous.runId!==a.runId || previous.taskId!==a.taskId) break;
+      const saved=matches.findLast(p=>p.taskId===a.taskId && p.attemptId===previous.id && p.status==='succeeded');
+      if (saved) return saved;
+      prevId=previous.resumeFromAttemptId;
+    }
+  }
   async #childTool(a:Attempt,name:string,raw:string,args:Readonly<Record<string,unknown>>,signal:AbortSignal) {
     if (name==='call_external_mcp') {
       if (Object.keys(args).some(key=>!['serverId','tool','arguments'].includes(key)) || !object(args.arguments)) throw new ManagerError('INVALID_INPUT','Choose an approved server, tool and JSON arguments.');
       const server=this.#extensions.getServer(this.#runExtensions(a),text(args.serverId,'Server ID'));
       const tool=text(args.tool,'Tool name');
+      const argumentDigest=extensionDigest(args.arguments);
       const processId=hash(canonical(['external-mcp',context(a),raw]));
       const prior=this.#storage.record<ProcessRow>('process',processId);
       const resultOf=async(result:ProcessRow['job'])=>{
         if (result.status!=='succeeded' || !result.artifact) throw new ManagerError('EXTERNAL_MCP_FAILED',result.error??('External MCP call '+result.status));
-        const output:unknown=JSON.parse((await this.#jobs.download(result.artifact)).toString('utf8'));
-        return {result:output,artifact:artifactRef(result.artifact),artifactId:result.artifact.id,processId,sha256:result.artifact.sha256};
+        const row=this.#artifact(a,result.artifact.id);
+        const output:unknown=JSON.parse((await this.#readArtifact(row)).toString('utf8'));
+        return {result:output,artifact:artifactRef(row.file),artifactId:row.id,processId:row.processId,sha256:row.file.sha256};
       };
       if (prior) {
-        if (prior.job.externalMcp?.serverId!==server.id || prior.job.externalMcp.tool!==tool || prior.job.externalMcp.argumentDigest!==extensionDigest(args.arguments)) throw new ManagerError('REQUEST_ID_CONFLICT','This external tool call ID was already used with other arguments.');
+        if (prior.job.externalMcp?.serverId!==server.id || prior.job.externalMcp.tool!==tool || prior.job.externalMcp.argumentDigest!==argumentDigest) throw new ManagerError('REQUEST_ID_CONFLICT','This external tool call ID was already used with other arguments.');
         // Never replay an unknown, failed or interrupted external side effect.
         return resultOf(prior.job);
       }
+      const saved=this.#recoveredExternalCall(a,server.id,server.verification.digest,tool,argumentDigest);
+      if (saved) return resultOf(saved.job);
       const token=await this.#externalToken(server.verification.credentialRef);
       signal.throwIfAborted();
       const job=this.#jobs.startExternal({projectId:a.projectId,sessionId:a.sessionId,taskId:a.taskId,attemptId:processId,toolId:toolId(a,raw),requestId:raw,server,tool,arguments:args.arguments,token});
@@ -2398,6 +2766,10 @@ export class TaskManager implements AthenaTaskManager {
     const task=this.#storage.record<TaskRow>('task',taskId);
     if(!task || task.sessionId!==this.#active)throw new ManagerError('TASK_SCOPE_MISMATCH','Task is outside the selected conversation.');
     if(!pending(task.status))throw new ManagerError('TASK_NOT_ACTIVE','Task is not active.');
+    const run=this.#storage.record<Run>('run',task.runId),root=run && this.#origin(run);
+    const control=root && this.#autonomy(root.id);
+    if(control && root)this.#commit(()=>this.#saveAutonomy(root.id,{...control,state:'stopped',
+      reason:'Automatic continuation stopped after a task was cancelled.',nextAttemptAt:undefined}));
     await this.#cancel(task);
     const updated=this.#storage.record<TaskRow>('task',taskId);
     if(!updated)throw new Error('Missing cancelled task.');
@@ -2410,7 +2782,11 @@ export class TaskManager implements AthenaTaskManager {
     const task=this.#storage.record<TaskRow>('task',run.taskId);
     if(!task)throw new Error('Missing root task.');
     // Record the user's run-level decision before aborting any Pi turn. The root may already be done.
-    this.#storage.transaction(()=>this.#storage.putRecord('run',{...run,cancellationRequested:true}));
+    this.#commit(()=>{
+      this.#storage.putRecord('run',{...run,cancellationRequested:true});
+      const root=this.#origin(run),control=root && this.#autonomy(root.id);
+      if(root && control)this.#saveAutonomy(root.id,{...control,state:'stopped',reason:'Research stopped by the user.',nextAttemptAt:undefined});
+    });
     await this.#cancel(task);
     return reply({type:'abort'},{runId});
   }
@@ -2428,7 +2804,8 @@ export class TaskManager implements AthenaTaskManager {
   }
   async close(){
     if(this.#closed)return;
-    this.#closed=true;this.#shutdown.abort();await Promise.allSettled(this.#manualCompiles);
+    this.#closed=true;clearTimeout(this.#continuationTimer);this.#shutdown.abort();
+    await Promise.allSettled([...this.#manualCompiles,...(this.#continuing?[this.#continuing]:[])]);
     const turns=[...this.#turns.values()];
     for(const t of turns)t.controller.abort();
     await Promise.all(turns.filter(t=>this.#executing.get(t.attempt.agentSessionId)===t.attempt).map(t=>t.runtime.command({type:'abort',id:randomUUID()})));

@@ -381,7 +381,7 @@ function createEnvironment({ width = 1440, height = 1000, reduced = false, stora
 function test(name, callback) { tests.push({ name, callback }); }
 const plain = value => JSON.parse(JSON.stringify(value));
 
-function hostedFixture({ stage = true, restart = false, recovery = false } = {}) {
+function hostedFixture({ stage = true, restart = false, recovery = false, backgroundSessions = false } = {}) {
   const fixture = { stream: null, fail: null, sent: [], files: [], bootstraps: 0, retryRequests: [], snapshotReads: 0 };
   const configuration = { version: 1, provider: 'custom', endpoint: 'https://models.example/v1', defaultModel: 'pinned-model', roleModels: {}, parallelLimit: 1, contextBudget: 32768, outputBudget: 4096 };
   let snapshot = { revision: 1, projectId: 'p1', sessionId: 's1', projects: [{ id: 'p1', name: 'Real project' }], sessions: [{ id: 's1', projectId: 'p1', title: 'Saved conversation' }], run: { id: null, status: 'ready', elapsedMs: 0, startedAt: null, model: null }, tasks: [], agents: [], tools: [], artifacts: [], events: [], approvals: [] };
@@ -412,7 +412,7 @@ function hostedFixture({ stage = true, restart = false, recovery = false } = {})
       assert.equal(fixture.stream.readyState, 1, 'SSE must be established before history hydration.');
       fixture.bootstraps++;
       if (fixture.fail === 'bootstrap') return { ok: false, json: async () => ({ error: 'Bootstrap unavailable' }) };
-      return { ok: true, json: async () => ({ snapshot, connection: { status: 'configured', configuration }, capabilities: ['create_project', 'create_session', 'open_session', 'set_project_model', 'cancel_run', ...(recovery ? ['retry_task'] : [])], piCapabilities: ['get_state', 'get_messages', 'prompt', 'abort', ...(stage ? ['stage_files'] : [])] }) };
+      return { ok: true, json: async () => ({ snapshot, connection: { status: 'configured', configuration }, capabilities: ['create_project', 'create_session', 'open_session', ...(backgroundSessions ? ['background_sessions'] : []), 'set_project_model', 'cancel_run', ...(recovery ? ['retry_task'] : [])], piCapabilities: ['get_state', 'get_messages', 'prompt', 'abort', ...(stage ? ['stage_files'] : [])] }) };
     }
     assert.equal(url, '/api/rpc');
     assert.equal(options.headers['Content-Type'], 'application/json');
@@ -563,6 +563,32 @@ test('Hosted activations isolate events and restore drafts while new projects ha
   assert.equal(env.state().piConnected, false);
   assert.equal(env.q('#ac-pi-transcript').children.length, 0);
   assert.deepEqual(plain(env.state().workspace.tasks), []);
+  env.destroy();
+});
+
+test('Hosted running conversation can be browsed away from after acceptance and retains its own draft and events', async () => {
+  const host=hostedFixture({backgroundSessions:true}),env=createEnvironment({host});
+  host.stream.open();
+  await env.waitFor(()=>env.q('#ac-pi-transcript').textContent.includes('Saved answer'));
+  env.type('#ac-prompt-input','First draft');
+  await env.window.AthenaApp.createResearch('Second conversation');
+  await env.waitFor(()=>env.state().piRuntime.session.sessionId==='s2');
+  await env.window.AthenaApp.submit('Work in the second conversation');
+  await env.waitFor(()=>host.sent.length===1);
+  env.type('#ac-prompt-input','Second draft');
+  env.click('[data-open-session="s1"]');
+  assert.equal(env.state().workspace.sessionId,'s2','Sending must finish admission before switching.');
+  host.stream.emit({type:'pi',sessionId:'s2',event:{type:'agent_start'}});
+  assert.equal(env.state().busy,true);
+  env.click('[data-open-session="s1"]');
+  await env.waitFor(()=>env.state().piRuntime.session.sessionId==='s1'&&env.q('#ac-pi-transcript').textContent.includes('Saved answer'));
+  assert.equal(env.state().prompt,'First draft');
+  host.stream.emit({type:'pi',sessionId:'s2',event:{type:'message_start',message:{role:'user',content:'Private second conversation'}}});
+  assert.equal(env.q('#ac-live-user').hidden,true);
+  assert.equal(host.cancelledRun,undefined);
+  env.click('[data-open-session="s2"]');
+  await env.waitFor(()=>env.state().piRuntime.session.sessionId==='s2');
+  assert.equal(env.state().prompt,'Second draft');
   env.destroy();
 });
 

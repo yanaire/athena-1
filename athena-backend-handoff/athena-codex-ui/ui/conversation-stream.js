@@ -28,7 +28,7 @@
       article.dataset.streamKey = entry.key;
       if (entry.kind === 'handoff') {
         article.className = 'ac-stream-handoff';
-        const label = document.createElement('summary'); label.className = 'cursor-interaction'; label.textContent = 'Manuscript instructions';
+        const label = document.createElement('summary'); label.className = 'cursor-interaction'; label.textContent = entry.handoff;
         const body = document.createElement('p'); body.className = 'ac-stream-text';
         article.append(label, body);
       } else if (entry.kind !== 'tool') {
@@ -39,6 +39,11 @@
       }
       nodes.set(entry.key, article);
       return article;
+    }
+    function handoffLabel(owner,message){
+      if(!owner)return;
+      if(message.researchContinuation===true)return 'Research resumed';
+      if(message.manuscriptHandoff===true)return 'Manuscript instructions';
     }
     function currentTools() {
       const workspace = options.getWorkspace?.();
@@ -189,7 +194,8 @@
         }
         if (!['user', 'assistant'].includes(message.role)) continue;
         if (message.role === 'user') {
-          entries.push({ key: 'history:' + index, kind: owner && message.manuscriptHandoff === true ? 'handoff' : 'message', role: 'user', text: text(message.content), attachments: attachmentNames(message.attachments), athena: owner, at });
+          const handoff=handoffLabel(owner,message);
+          entries.push({ key: 'history:' + index, kind: handoff ? 'handoff' : 'message', handoff, role: 'user', text: text(message.content), attachments: attachmentNames(message.attachments), athena: owner, at });
           continue;
         }
         const content = typeof message.content === 'string' ? [{ type: 'text', text: message.content }] : message.content || [];
@@ -224,9 +230,9 @@
         if (pendingUser && !pendingUser.athena) pendingUser.athena = owner;
       }
       if (event.type === 'message_start' && event.message?.role === 'user') {
-        const handoff = owner && event.message.manuscriptHandoff === true;
+        const handoff = handoffLabel(owner,event.message);
         if (!pendingUser || pendingUser.observed || handoff) {
-          pendingUser = { key: 'user:' + generation + ':' + (++userCounter), kind: handoff ? 'handoff' : 'message', role: 'user', text: '', athena: owner, at: null, order: lastObservedOrder + 0.5 };
+          pendingUser = { key: 'user:' + generation + ':' + (++userCounter), kind: handoff ? 'handoff' : 'message', handoff, role: 'user', text: '', athena: owner, at: null, order: lastObservedOrder + 0.5 };
           entries.push(pendingUser); liveKeys.add(pendingUser.key);
         }
         pendingUser.observed = true;

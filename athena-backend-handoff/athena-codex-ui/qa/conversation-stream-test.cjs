@@ -89,6 +89,25 @@ test('a message that first emits text after a tool stays after that tool', () =>
   } finally { off(); pi.destroy(); e.close(); }
 });
 
+test('host-owned research continuation folds in live and restored chat, while identical user text and actual replies stay visible',()=>{
+  const e=environment();
+  const original=message('user','Athena continued from the saved plan.',owner(),100);
+  const continued={...message('user',original.content,owner('run-one','checkpoint'),200),researchContinuation:true};
+  const result=message('assistant','Missing measurement verified.',continued.athena,300);
+  const check=()=>{
+    assert.equal(e.host.querySelectorAll('article[data-role="user"]').length,1);
+    assert.equal(e.host.querySelector('.ac-stream-handoff').open,false);
+    assert.equal(e.host.querySelector('.ac-stream-handoff summary').textContent,'Research resumed');
+  };
+  try{
+    e.view.observe({type:'message_start',...original.athena,message:original});
+    e.view.observe({type:'message_start',...continued.athena,message:continued});
+    check();
+    e.view.history([original,continued,result]);check();
+    assert.match(e.host.querySelector('[data-role="assistant"]').textContent,/Missing measurement verified/);
+  }finally{e.close();}
+});
+
 test('an observed steering message does not replace the original user request or reorder earlier work', () => {
   const e = environment(), pi = e.window.AthenaPiActivity.create();
   const off = pi.subscribe(snapshot => { if (snapshot.sequence) e.view.render(snapshot); });

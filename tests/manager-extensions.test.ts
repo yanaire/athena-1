@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
 import { privateTestDirectory } from './platform-test-helpers.ts';
 import { TaskManager } from '../runtime/manager.ts';
+import { analysisAccess } from '../runtime/analysis-sandbox.ts';
 import { openLocalCredentials } from '../runtime/local-credentials.ts';
 import type { PluginManifest } from '../runtime/extensions.ts';
 import type { ExternalServerDefinition } from '../runtime/external-mcp-client.ts';
@@ -65,10 +66,10 @@ async function body(req: IncomingMessage) {
 
 // The provider is controlled; the Pi SDK, tool routing, HTTP MCP, queue, credentials,
 // SQLite, artifact downloads and manual retry are real. This requires no WASI binary.
-async function fixture(t: TestContext, handler: Handler) {
+async function fixture(t: TestContext, handler: Handler, withReference=false) {
   const directory = await realpath(privateTestDirectory(join(tmpdir(), 'athena-manager-extensions-')));
   const hits: Wire[] = [], calls: { authorization: string | undefined; args: unknown }[] = [];
-  const connection = { available: true, authorizations: [] as (string | undefined)[] };
+  const connection = { available: true, loseReply: false, authorizations: [] as (string | undefined)[] };
   const provider = createServer(async (req, res) => {
     try { const wire = await body(req) as Wire; hits.push(wire); await handler(wire, res); }
     catch (error) { res.writeHead(500).end(JSON.stringify({ error: String(error) })); }
@@ -86,11 +87,12 @@ async function fixture(t: TestContext, handler: Handler) {
     if (message.method === 'initialize') {
       res.setHeader('Mcp-Session-Id', 'manager-fixture');
       result = { protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'manager-fixture', version: '1.0.0' } };
-    } else if (message.method === 'tools/list') result = { tools: [{ name: 'double', description: 'Double an explicitly supplied number.', inputSchema: {
+    } else if (message.method === 'tools/list') result = { tools: (withReference?['double','reference']:['double']).map(name=>({name,description:'Double an explicitly supplied number.',inputSchema:{
       type: 'object', properties: { value: { type: 'number' } }, required: ['value'], additionalProperties: false,
-    } }] };
+    }})) };
     else {
       calls.push({ authorization: req.headers.authorization, args: message.params.arguments });
+      if (connection.loseReply) { res.destroy(); return; }
       const credential = req.headers.authorization?.replace(/^Bearer /, '') ?? '';
       result = { content: [{ type: 'text', text: String(message.params.arguments.value * 2) }],
         structuredContent: { doubled: message.params.arguments.value * 2, credentialEcho: credential } };
@@ -105,7 +107,7 @@ async function fixture(t: TestContext, handler: Handler) {
     ATHENA_API_KEY: '', ATHENA_MODEL_CONCURRENCY: '2', ATHENA_MAX_CHILDREN: '3', ATHENA_MAX_DEPTH: '1' };
   const previous = Object.entries(values).map(([key, value]) => { const old = process.env[key]; process.env[key] = value; return { key, old }; });
   const definition: ExternalServerDefinition = { id: 'remote', name: 'External lab', transport: 'streamable-http',
-    url: `http://127.0.0.1:${mcpAddress.port}/mcp`, allowedTools: ['double'], auth: 'bearer', timeoutMs: 2000 };
+    url: `http://127.0.0.1:${mcpAddress.port}/mcp`, allowedTools: withReference?['double','reference']:['double'], auth: 'bearer', timeoutMs: 2000 };
   const manifest: PluginManifest = { schemaVersion: 1, id: 'laboratory', name: 'Laboratory', description: 'Explicit research resources.', version: '1.0.0',
     skills: [{ id: 'inspect', name: 'Inspect remote measurement', description: 'Verify a remote measurement.', version: '1.0.0', body: oldBody,
       roles: ['child'], requiredCapabilities: ['call_external_mcp'] },
@@ -306,6 +308,53 @@ test('actual Pi uses selected skill bodies and pinned external credentials acros
   assert.equal(f.hits.length, requestCount); assert.equal(f.calls.length, 2);
 });
 
+test('a recovered worker reuses its published result and a newly generated tool ID cannot duplicate an uncertain operation', {timeout:30000}, async t=>{
+  let taskId='',originalReceipt='',recoveredReceipt='';
+  const call=(value:number):Call=>({name:'call_external_mcp',args:{serverId:'laboratory/remote',tool:'double',arguments:{value}}});
+  const f=await fixture(t,(wire,res)=>{
+    const results=outputs(wire);
+    if(parent(wire)){
+      const resuming=input(wire).includes('Continue this research request');
+      if(!resuming && !results.length)return completion(res,{name:'plan_research',args:{objective:'Measure two conditions',acceptanceCriteria:['Publish both results'],stages:['Measure','Verify']}});
+      if(!resuming && results.length===1)return completion(res,{name:'spawn_agent',args:{title:'Measure conditions',prompt:'Measure two conditions.'}});
+      if(resuming && !results.length)return completion(res,{name:'send_to_agent',args:{taskId,message:'Continue the disconnected measurement worker.'}});
+      if(results.length===(resuming?1:2)){
+        taskId=JSON.parse(results.at(-1)!).taskId;
+        return completion(res,{name:'wait_for_agents',args:{}});
+      }
+      if(!resuming)f.connection.available=true;
+      return completion(res,'Reported the recorded measurement state.');
+    }
+    const resumed=input(wire).includes('Continue the disconnected measurement worker');
+    if(!results.length)return completion(res,call(1));
+    if(results.length===1){
+      if(resumed)recoveredReceipt=results[0]!;
+      else {originalReceipt=results[0]!;f.connection.available=false;}
+      return completion(res,call(2));
+    }
+    if(resumed && results.length===2){f.connection.loseReply=true;return completion(res,call(3));}
+    if(resumed && results.length===3)return completion(res,call(3));
+    return completion(res,'Finished this attempt.');
+  });
+  const {manager}=await f.manager();
+  const {project}=await manager.createProject({name:'Measurement recovery',researchWorkflow:true});
+  await f.install(manager,project.id);
+  const {sessionId}=await manager.createSession({projectId:project.id,title:'Measurement recovery'});
+  const displayed:unknown[]=[];
+  manager.subscribePi(sessionId,event=>{if(event.type==='message_start')displayed.push(event.message);});
+  await manager.pi(sessionId,{type:'prompt',id:'recover-measurements',message:'Measure the conditions and write a paper.'});
+  await when(manager,s=>s.tasks.some(task=>task.id===taskId && task.status==='succeeded') && f.hits.some(w=>!parent(w) && outputs(w).some(s=>s.includes('has an unconfirmed outcome'))));
+  assert.deepEqual(JSON.parse(recoveredReceipt),JSON.parse(originalReceipt));
+  assert.deepEqual(f.calls.map(c=>c.args),[{value:1},{value:2},{value:3}]);
+  assert.equal(manager.getSnapshot().artifacts.length,2);
+  const history=await manager.getAgentHistory(sessionId,sessionId);
+  for(const messages of [displayed,history.messages]){
+    assert.ok(messages.some(m=>typeof m==='object'&&m!==null&&'researchContinuation' in m&&m.researchContinuation===true));
+    assert.match(JSON.stringify(messages),/Measure the conditions and write a paper/);
+    assert.doesNotMatch(JSON.stringify(messages),/Continue this research request from the stored checkpoints/);
+  }
+});
+
 test('actual child tool routing rejects foreign-project resources and duplicate external request IDs never execute twice', { timeout: 30000 }, async t => {
   const f = await fixture(t, (wire, res) => {
     const results = outputs(wire);
@@ -348,4 +397,144 @@ test('actual child tool routing rejects foreign-project resources and duplicate 
   const saved = await manager.artifactDownload(sessionId, result.artifacts[0]!.id);
   assert.equal(JSON.parse(Buffer.from(saved.bytes).toString()).result.structuredContent.doubled, 8);
   assert.ok(!JSON.stringify(workerRequests).includes(tokenA) && !JSON.stringify(workerRequests).includes(tokenB));
+});
+
+const researchOptions={timeout:30_000,skip:(await analysisAccess()).available?false:'The research workflow requires a prepared local WASI runtime.'};
+
+test('a pre-dispatch transport failure resumes the same adaptive trial and preserves its worker receipts', researchOptions, async t=>{
+  let missionId='';
+  let plannerCalls=0;
+  const parsed: {status:string;trials:{number:number;priorWorkers?:{taskId:string;attemptId:string}[];worker:{taskId:string;attemptId:string};outcome?:{value:number}}[]}[]=[];
+  const measurementTool={serverId:'laboratory/remote',tool:'double'};
+  const f=await fixture(t,(wire,res)=>{
+    const results=outputs(wire);
+    if(wire.tools && parent(wire)){
+      const recovery=input(wire).includes('Continue this research request');
+      if(!results.length && !recovery)return completion(res,{name:'plan_research',args:{objective:'Measure the fixture value',acceptanceCriteria:['Measured value equals 14'],stages:['Measure','Verify']}});
+      if(!results.length || (!recovery && results.length===1)){
+        if(!recovery)missionId=JSON.parse(results[0]!).id;
+        return completion(res,{name:'run_experiment_mission',args:{missionId,...(recovery?{}:{contract:{protocol:'Double 7',resultFile:'mcp-result.json',metricPath:['result','structuredContent','doubled'],direction:'at_least',target:14,maxTrials:1,fileIds:[],measurementTool}})}});
+      }
+      parsed.push(JSON.parse(results.at(-1)!));
+      f.connection.available=true;
+      return completion(res,'Recorded the mission checkpoint.');
+    }
+    if(input(wire).includes('Select the next experiment')){
+      plannerCalls++;
+      return completion(res,JSON.stringify({action:'experiment',reason:'Measure the only allowed condition',instruction:'Call the measuring device with value 7.',parentTrial:null}));
+    }
+    // Deliberately re-request the successful prerequisite with a fresh tool-call ID on recovery.
+    if(!results.length)return completion(res,{name:'call_external_mcp',args:{serverId:measurementTool.serverId,tool:'reference',arguments:{value:3}}});
+    if(results.length===1){
+      if(!input(wire).includes('Continue this same trial'))f.connection.available=false;
+      return completion(res,{name:'call_external_mcp',args:{...measurementTool,arguments:{value:7}}});
+    }
+    if(input(wire).includes('Continue this same trial'))return failure(res); // The measurement was published before the worker's final reply.
+    return completion(res,'Recorded the tool response.');
+  },true);
+  const {manager}=await f.manager();
+  const {project}=await manager.createProject({name:'Single trial',researchWorkflow:true});
+  await f.install(manager,project.id);
+  const {sessionId}=await manager.createSession({projectId:project.id,title:'Transport recovery'});
+  await manager.pi(sessionId,{type:'prompt',id:'measure-once',message:'$laboratory/unused Measure the fixture and write a paper.'});
+  await terminal(manager);
+  assert.equal(parsed[0]?.status,'blocked');
+  assert.equal(parsed[0]?.trials.length,1);
+  assert.equal(parsed[0]?.trials[0]?.outcome,undefined);
+  assert.equal(f.calls.length,1);
+  await when(manager,s=>['succeeded','failed'].includes(s.run.status) && parsed.some(study=>study.status==='reached'));
+  const recovered=parsed.find(s=>s.status==='reached');
+  assert.ok(recovered,JSON.stringify({parsed,taskStatus:manager.getSnapshot().tasks.map(t=>[t.title,t.status]),calls:f.calls.length}));
+  assert.equal(plannerCalls,1);
+  assert.equal(recovered.trials.length,1);
+  const trial=recovered.trials[0]!;
+  assert.equal(trial.outcome?.value,14);
+  const original=parsed[0]!.trials[0]!.worker;
+  assert.equal(trial.priorWorkers?.[0]?.attemptId,original.attemptId);
+  assert.equal(trial.worker.taskId,original.taskId);
+  assert.notEqual(trial.worker.attemptId,original.attemptId);
+  assert.equal(manager.getSnapshot().attempts.find(a=>a.id===trial.worker.attemptId)?.status,'failed');
+  assert.deepEqual(f.calls.map(c=>c.args),[{value:3},{value:7}]);
+  const uses=manager.getExtensions(project.id).skillUses.filter(s=>s.skillId==='laboratory/unused' && s.mode==='explicit');
+  assert.equal(uses.length,2);
+  assert.equal(uses[0]!.sha256,uses[1]!.sha256);
+  assert.notEqual(uses[0]!.attemptId,uses[1]!.attemptId);
+});
+
+test('cancelling a research worker from the desktop stops the autonomous study across restart', researchOptions, async t=>{
+  const f=await fixture(t,(wire,res)=>{
+    if(!parent(wire))return; // The selected worker is stopped while its request is pending.
+    const n=outputs(wire).length;
+    if(!n)return completion(res,{name:'plan_research',args:{objective:'Measure a response',acceptanceCriteria:['An observed response'],stages:['Measure','Verify']}});
+    if(n===1)return completion(res,{name:'spawn_agent',args:{title:'Measure response',role:'experiment',prompt:'Wait for the observation.'}});
+    if(n===2)return completion(res,{name:'wait_for_agents',args:{}});
+    completion(res,'Reported the interrupted observation.');
+  });
+  let {manager}=await f.manager();
+  const {project}=await manager.createProject({name:'Intentional stop',researchWorkflow:true});
+  const {sessionId}=await manager.createSession({projectId:project.id,title:'Observed response'});
+  await manager.pi(sessionId,{type:'prompt',id:'stop-from-worker',message:'Measure the response and write a paper.'});
+  const snapshot=await when(manager,s=>s.tasks.some(t=>t.title==='Measure response' && t.status==='running'));
+  const child=task(snapshot,'Measure response');
+  await manager.cancelTask(child.id);
+  const scope={projectId:project.id,sessionId};
+  const flow=()=>manager.paperRequest('researchFlow',scope) as Promise<{autonomy:{state:string};checkpoint:string}>;
+  const stopped=await flow();
+  assert.equal(stopped.autonomy.state,'stopped');
+  assert.equal(task(manager.getSnapshot(),'Measure response').status,'cancelled');
+  const hits=f.hits.length;
+  await manager.close();
+  ({manager}=await f.manager());
+  await manager.openSession(sessionId);
+  assert.equal((await flow()).checkpoint,stopped.checkpoint);
+  assert.equal((await flow()).autonomy.state,'stopped');
+  assert.equal(f.hits.length,hits);
+});
+
+test('a confirmed uncertain external trial remains unmeasured and is never dispatched again',researchOptions,async t=>{
+  const measurementTool={serverId:'laboratory/remote',tool:'double'};
+  let missionId='';
+  const reports:{status:string;trials:{outcome?:{error?:string}}[]}[]=[];
+  const f=await fixture(t,(wire,res)=>{
+    const results=outputs(wire);
+    if(wire.tools && parent(wire)){
+      const resumed=input(wire).includes('Continue this research request');
+      if(!results.length && !resumed)return completion(res,{name:'plan_research',args:{objective:'Measure once',acceptanceCriteria:['Proven value'],stages:['Measure','Verify']}});
+      if(!results.length || (!resumed && results.length===1)){
+        if(!resumed)missionId=JSON.parse(results[0]!).id;
+        return completion(res,{name:'run_experiment_mission',args:{missionId,...(resumed?{}:{contract:{protocol:'Measure once',resultFile:'mcp-result.json',metricPath:['result','structuredContent','doubled'],direction:'at_least',target:14,maxTrials:1,fileIds:[],measurementTool}})}});
+      }
+      reports.push(JSON.parse(results.at(-1)!));
+      return completion(res,'Saved the reported trial state.');
+    }
+    if(input(wire).includes('Select the next experiment'))return completion(res,JSON.stringify({action:'experiment',reason:'Measure the only condition',instruction:'Measure 7',parentTrial:null}));
+    if(!results.length)return completion(res,{name:'call_external_mcp',args:{...measurementTool,arguments:{value:7}}});
+    completion(res,'Reported the failed tool response.');
+  });
+  const {manager}=await f.manager();
+  const {project}=await manager.createProject({name:'Uncertain instrument',researchWorkflow:true});
+  await f.install(manager,project.id);
+  const {sessionId}=await manager.createSession({projectId:project.id,title:'Lost tool response'});
+  f.connection.loseReply=true;
+  await manager.pi(sessionId,{type:'prompt',id:'lost-response',message:'Measure once and write a paper.'});
+  await terminal(manager);
+  assert.equal(reports[0]?.status,'blocked');
+  assert.equal(f.calls.length,1);
+  const scope={projectId:project.id,sessionId};
+  type Flow={runId:string;checkpoint:string;autonomy:{state:string;uncertainProcessIds?:string[]}};
+  const read=()=>manager.paperRequest('researchFlow',scope) as Promise<Flow>;
+  let flow=await read();
+  const until=Date.now()+8000;
+  while(flow.autonomy.state!=='blocked' && Date.now()<until){
+    await new Promise(resolve=>setTimeout(resolve,50));
+    flow=await read();
+  }
+  assert.equal(flow.autonomy.uncertainProcessIds?.length,1);
+  const checkpoint={...scope,runId:flow.runId,expectedAttemptId:flow.checkpoint};
+  await assert.rejects(manager.paperRequest('resumeResearch',checkpoint),{code:'CHECKPOINT_UNAVAILABLE'});
+  f.connection.loseReply=false;
+  await manager.paperRequest('resumeResearch',{...checkpoint,confirmedProcessIds:flow.autonomy.uncertainProcessIds});
+  await when(manager,s=>s.run.status==='succeeded' && reports.some(report=>report.status==='exhausted'));
+  assert.match(reports.at(-1)!.trials[0]!.outcome!.error!,/remote outcome was checked/);
+  assert.deepEqual(f.calls.map(c=>c.args),[{value:7}]);
 });

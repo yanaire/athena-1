@@ -22,6 +22,8 @@ export type MissionTrial = {
   rejectedPlanner?: string;
   decision?: MissionDecision;
   worker?: ChildReceipt;
+  priorWorkers?: ChildReceipt[];
+  reconnectWorker?: string;
   workerNote?: string;
   outcome?: { value: number; artifact: ResearchTarget; evidenceId:string } | { error: string; candidate?:ResearchTarget };
 };

@@ -31,7 +31,10 @@ export type Attempt = Context & { readonly workerRole?:import("./worker-roles.ts
   readonly prompt: string; readonly acceptedAt: number; readonly startedAt: number | null; readonly endedAt: number | null;
   readonly result?: string; readonly error?: string; readonly fileIds: readonly string[];
   readonly artifactGrants?: readonly string[]; readonly model?: ModelReference;
-  readonly explicitSkillIds?:readonly string[]; readonly kind?: 'reconciliation'; readonly retryOfAttemptId?: string };
+  readonly explicitSkillIds?:readonly string[]; readonly kind?: 'reconciliation'; readonly retryOfAttemptId?: string;
+  readonly researchContinuation?: true;
+  /** Previous worker on this same interrupted assignment, as selected by the host. */
+  readonly resumeFromAttemptId?: string };
 export type TaskRow = Task & Context & { readonly result?: string; readonly error?: string };
 export type AgentSession = { readonly id: string; readonly projectId: string; readonly sessionId: string;
   readonly sessionDir: string; readonly sessionFile: string; readonly role: 'parent' | 'child'; readonly workerRole?:import('./worker-roles.ts').WorkerRole; readonly model?: ModelReference | null };

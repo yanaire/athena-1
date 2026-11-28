@@ -173,6 +173,7 @@ try{
     await rpc('resumeResearch',[{...scope,runId:restored.runId,expectedAttemptId:restored.checkpoint}]);
   }
   if(variant==='draft'){
+    await page.locator('[data-flow-tab="preview"]').click();
     const draft=page.getByRole('region',{name:'Live manuscript'});
     await draft.waitFor({timeout:90000});
     await page.waitForFunction(()=>window.draftSamples.some((text,i,all)=>i>0 && text.startsWith(all[i-1]) && text.length>all[i-1].length),null,{timeout:20000});

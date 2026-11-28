@@ -4,7 +4,7 @@
   },
   "private": true,
   "scripts": {
-    "test": "node integration-test.cjs && node --test activity-labels-test.cjs conversation-stream-test.cjs extensions-test.cjs surfaces-capabilities-test.cjs workflow-graph-test.cjs",
+    "test": "node integration-test.cjs && node --test activity-labels-test.cjs conversation-stream-test.cjs extensions-test.cjs research-flow-test.cjs project-graph-test.cjs surfaces-capabilities-test.cjs workflow-graph-test.cjs",
     "test:browser": "node chat-browser-test.mjs"
   },
   "devDependencies": {

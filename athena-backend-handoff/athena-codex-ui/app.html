@@ -86,6 +86,11 @@
         <div class="ac-panel-heading">
           <button type="button" class="ac-side-picker cursor-interaction" id="ac-side-picker" data-action="surface-home" aria-label="Choose a surface"><i data-lucide="panels-top-left" aria-hidden="true"></i><span id="ac-side-title">Surfaces</span><i data-lucide="chevron-down" aria-hidden="true"></i></button>
         </div>
+        <nav id="ac-flow-nav" aria-label="Research views" hidden>
+          <button type="button" data-flow-tab="progress" aria-pressed="true">Workflow</button>
+          <button type="button" data-flow-tab="results" aria-pressed="false">Experiment results</button>
+          <button type="button" data-flow-tab="preview" aria-pressed="false">Paper</button>
+        </nav>
         <nav class="aw-side-nav" aria-label="Research workspace views">
           <button type="button" class="ac-icon-button cursor-interaction" data-workspace-view="workflow" aria-label="Workflow" data-morph-tooltip="Workflow"><i data-lucide="workflow" aria-hidden="true"></i></button>
           <button type="button" class="ac-icon-button cursor-interaction" data-workspace-view="artifacts" aria-label="Artifacts" data-morph-tooltip="Artifacts"><i data-lucide="panels-top-left" aria-hidden="true"></i></button>
@@ -118,7 +123,6 @@
         </section>
         <section class="ac-panel-body" id="ac-view-manuscript" role="tabpanel" aria-labelledby="ac-tab-manuscript" hidden>
           <section id="ac-research-flow" class="ac-paper-project" hidden aria-label="Research workflow">
-            <div><button data-flow-tab="progress" aria-pressed="true">Research progress</button><button data-flow-tab="preview" aria-pressed="false">Manuscript preview</button></div>
             <div data-flow-body></div><p data-flow-notice role="status"></p>
           </section>
           <section id="ac-paper-project" class="ac-paper-project" aria-label="Manuscript workspace" hidden>

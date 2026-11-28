@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, isAbsolute, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -254,12 +255,49 @@ export function manuscriptTex(title:string, markdown:string, style:Template,refe
     front.splice(front.indexOf('\\begin{document}'),0,'\\usepackage{hyperref}');
   return [...front,...body,'\\end{document}',''].join('\n');
 }
-export async function typeset(title:string,markdown:string,style:Template,signal:AbortSignal,references?:readonly PaperReference[],preamble?:readonly string[],series:readonly MeasuredSeries[]=[],diagrams:readonly DiagramSource[]=[]) {
-  const tex=manuscriptTex(title,markdown,style,references,preamble,series,diagrams);
-  const dir=await mkdtemp(join(tmpdir(),'athena-typeset-'));
+export type TypesettingRepair = {kind:'manuscript'} | {kind:'dependency'; file?:string};
+export class TypesettingError extends ManagerError {
+  readonly repair?:TypesettingRepair;
+  constructor(message:string,repair?:TypesettingRepair) {
+    super('TYPESET_FAILED',message);
+    this.repair=repair;
+  }
+}
+export function repairFromLatexError(detail:string):TypesettingRepair|undefined {
+  if(/^spawn pdflatex (?:ENOENT|EACCES)/.test(detail))return {kind:'dependency'};
+  const missing=/File [`']([A-Za-z0-9][A-Za-z0-9_.-]{0,127}\.(?:sty|cls))' not found/.exec(detail);
+  if(missing)return {kind:'dependency',file:missing[1]};
+  if(/Unicode character .+ not set up for use with LaTeX/s.test(detail))return {kind:'manuscript'};
+}
+function texSearchPath() {
   const search=(process.env.PATH??'').split(delimiter).filter(isAbsolute);
   if(process.platform==='darwin')search.push('/Library/TeX/texbin','/opt/homebrew/bin','/usr/local/bin');
-  const path=search.join(delimiter);
+  return search;
+}
+export async function typesettingDependencyReady(file?:string) {
+  const search=texSearchPath();
+  if(!file){
+    for(const dir of search){
+      const executable=join(dir,process.platform==='win32'?'pdflatex.exe':'pdflatex');
+      try {await access(executable,constants.X_OK);if((await stat(executable)).isFile())return true;}catch{/* Search remaining PATH entries. */}
+    }
+    return false;
+  }
+  if(!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}\.(?:sty|cls)$/.test(file))return false;
+  const dir=await mkdtemp(join(tmpdir(),'athena-tex-probe-'));
+  try{
+    const result=await execute('kpsewhich',[file],{timeout:1500,maxBuffer:4096,windowsHide:true,
+      cwd:dir,env:{PATH:search.join(delimiter),SystemRoot:process.env.SystemRoot,HOME:dir,TEXMFHOME:join(dir,'texmf')}});
+    return !!result.stdout.trim();
+  }catch{return false;}
+  finally{await rm(dir,{recursive:true,force:true});}
+}
+export async function typeset(title:string,markdown:string,style:Template,signal:AbortSignal,references?:readonly PaperReference[],preamble?:readonly string[],series:readonly MeasuredSeries[]=[],diagrams:readonly DiagramSource[]=[]) {
+  let tex:string;
+  try{tex=manuscriptTex(title,markdown,style,references,preamble,series,diagrams);}
+  catch(error){throw new TypesettingError((error as Error).message,{kind:'manuscript'});}
+  const dir=await mkdtemp(join(tmpdir(),'athena-typeset-'));
+  const path=texSearchPath().join(delimiter);
   // Fixed commands, generated literal text, private work directory and a clean kpathsea environment.
   const env={PATH:path,SystemRoot:process.env.SystemRoot,HOME:dir,TMPDIR:dir,TEMP:dir,TMP:dir,
     openin_any:'p',openout_any:'p',shell_escape:'f',TEXMFOUTPUT:dir,TEXMFHOME:join(dir,'texmf'),TZ:'UTC'};
@@ -285,6 +323,7 @@ export async function typeset(title:string,markdown:string,style:Template,signal
   } catch(error) {
     signal.throwIfAborted();
     const e=error as {stdout?:string;message:string};
-    throw new ManagerError('TYPESET_FAILED',(e.stdout?.trim().slice(-1800)||e.message).replaceAll(dir,'[build directory]'));
+    const detail=(e.stdout?.trim().slice(-1800)||e.message).replaceAll(dir,'[build directory]');
+    throw new TypesettingError(detail,repairFromLatexError(e.stdout||detail));
   } finally {await rm(dir,{recursive:true,force:true});}
 }

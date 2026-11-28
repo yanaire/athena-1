@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { manuscriptTex, readTemplate, typeset } from '../runtime/typesetting.ts';
+import { manuscriptTex, readTemplate, typeset, typesettingDependencyReady, repairFromLatexError } from '../runtime/typesetting.ts';
 
 test('attached journal templates retain supported class options and packages', () => {
   const preamble = ['\\documentclass[final,3p,times]{elsarticle}', '\\usepackage{booktabs}'];
@@ -83,9 +83,16 @@ test('a missing TeX engine reports its actual subprocess failure', {skip:process
   const previous = process.env.PATH;
   try {
     process.env.PATH = '/nonexistent-athena-test-directory';
-    await assert.rejects(typeset('Study', 'Methods', 'article', new AbortController().signal), {code:'TYPESET_FAILED',message:/pdflatex.*ENOENT/});
+    await assert.rejects(typeset('Study', 'Methods', 'article', new AbortController().signal), {code:'TYPESET_FAILED',message:/pdflatex.*ENOENT/,repair:{kind:'dependency'}});
+    assert.equal(await typesettingDependencyReady(),false);
   } finally {
     if(previous===undefined)delete process.env.PATH;
     else process.env.PATH = previous;
   }
+});
+
+test('classifies missing journal dependencies separately from manuscript edits',()=>{
+  assert.deepEqual(repairFromLatexError("! LaTeX Error: File `elsarticle.cls' not found."),{kind:'dependency',file:'elsarticle.cls'});
+  assert.deepEqual(repairFromLatexError("main.tex:4: LaTeX Error: Unicode character Ǵ (U+01F4)\n not set up for use with LaTeX."),{kind:'manuscript'});
+  assert.equal(repairFromLatexError('Emergency stop while opening another file.'),undefined);
 });
