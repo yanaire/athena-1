@@ -92,7 +92,6 @@ async function fixture(t: TestContext, handler: Handler, withReference=false) {
     }})) };
     else {
       calls.push({ authorization: req.headers.authorization, args: message.params.arguments });
-      if(connection.dropInvocation){req.socket.destroy();return;}
       if (connection.loseReply) { res.destroy(); return; }
       const credential = req.headers.authorization?.replace(/^Bearer /, '') ?? '';
       result = { content: [{ type: 'text', text: String(message.params.arguments.value * 2) }],
@@ -516,7 +515,7 @@ test('a confirmed uncertain external trial remains unmeasured and is never dispa
   const {project}=await manager.createProject({name:'Uncertain instrument',researchWorkflow:true});
   await f.install(manager,project.id);
   const {sessionId}=await manager.createSession({projectId:project.id,title:'Lost tool response'});
-  f.connection.dropInvocation=true;
+  f.connection.loseReply=true;
   await manager.pi(sessionId,{type:'prompt',id:'lost-response',message:'Measure once and write a paper.'});
   await terminal(manager);
   assert.equal(reports[0]?.status,'blocked');
@@ -533,7 +532,7 @@ test('a confirmed uncertain external trial remains unmeasured and is never dispa
   assert.equal(flow.autonomy.uncertainProcessIds?.length,1);
   const checkpoint={...scope,runId:flow.runId,expectedAttemptId:flow.checkpoint};
   await assert.rejects(manager.paperRequest('resumeResearch',checkpoint),{code:'CHECKPOINT_UNAVAILABLE'});
-  f.connection.dropInvocation=false;
+  f.connection.loseReply=false;
   await manager.paperRequest('resumeResearch',{...checkpoint,confirmedProcessIds:flow.autonomy.uncertainProcessIds});
   await when(manager,s=>s.run.status==='succeeded' && reports.some(report=>report.status==='exhausted'));
   assert.match(reports.at(-1)!.trials[0]!.outcome!.error!,/remote outcome was checked/);
