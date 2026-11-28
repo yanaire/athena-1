@@ -9,7 +9,7 @@
   <p>Research with agents. Inspect their work. Keep the evidence.</p>
 
   <a href="https://github.com/yanaire/athena/actions/workflows/verify.yml"><img alt="Verify Athena" src="https://github.com/yanaire/athena/actions/workflows/verify.yml/badge.svg?branch=main"></a>
-  <img alt="Platform: macOS Apple Silicon and Intel" src="https://img.shields.io/badge/macOS-arm64%20%2F%20x64-555555?style=flat">
+  <img alt="Platform: macOS Apple Silicon" src="https://img.shields.io/badge/macOS-arm64-555555?style=flat">
   <img alt="Platform: Windows x64" src="https://img.shields.io/badge/Windows-x64-555555?style=flat">
   <img alt="Development stage: source preview" src="https://img.shields.io/badge/stage-source%20preview-B39A62?style=flat">
 
@@ -99,9 +99,9 @@ workflow inspired by Hyra 2.0, not an imported Hyra runtime.
 
 ### Workflow and desktop platforms
 
-The source includes the recorded Workflow DAG and reviewed chat fixes. Desktop
-builds support Apple Silicon and Intel on macOS 13.5 or later, and Windows x64
-with an NSIS installer. `npm run desktop:build` selects the native target. See
+The source includes the recorded Workflow DAG and reviewed chat fixes. CI verifies
+the Apple Silicon macOS app and the Windows x64 NSIS installer. Intel Macs retain
+a manual source-build target. `npm run desktop:build` selects the native target. See
 the [installation guide](docs/installation.md) and [Korean installation guide](docs/installation.ko.md)
 for prerequisites and explicit target commands.
 
@@ -293,7 +293,7 @@ npm test
 python3 athena-backend-handoff/athena-codex-ui/build.py
 ```
 
-The [Verify Athena workflow](.github/workflows/verify.yml) runs `history-secrets`, `apple-silicon`, `browser-chat`, `desktop-mac-intel` and `desktop-windows-x64`. It runs the host suites on native runners, boots desktop apps installed from both Mac DMGs and the Windows NSIS installer, and exercises chat and workflow in Chromium with synthetic inputs. All five checks are required on `main`.
+The [Verify Athena workflow](.github/workflows/verify.yml) runs `history-secrets`, `apple-silicon`, `browser-chat` and `desktop-windows-x64`. It runs the native host suites, starts apps installed from the Apple Silicon DMG and Windows x64 NSIS installer, and exercises chat and workflow in Chromium with synthetic inputs. These four checks are required on `main`.
 
 For a separate live-model acceptance run, configure the endpoint and model above:
 

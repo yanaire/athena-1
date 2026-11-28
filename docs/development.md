@@ -2,7 +2,7 @@
 
 This document describes a local source build. The cross-platform candidate supports native macOS arm64, macOS x64 and Windows x64 packaging. Developer ID signing, notarization, Windows Authenticode signing and acceptance on another user's computer remain desktop-release work. No virtual machine is required to build on the matching operating system.
 
-Builds use Node 24.22.3, npm, Python 3 for UI assembly, and Rust 1.99.1. macOS needs Xcode Command Line Tools, `curl`, `tar` and `unzip`; Windows needs the MSVC C++ build tools/Windows SDK, .NET Framework 4.8 or later, WebView2, Windows PowerShell, `curl.exe` and `tar.exe`. The native targets are `aarch64-apple-darwin`, `x86_64-apple-darwin`, and `x86_64-pc-windows-msvc`. npm and both Cargo graphs use lockfiles. Upstream Node and WASI archives are checksum pinned. The [workflow](../.github/workflows/verify.yml) verifies each native platform and the Chromium UI without Docker:
+Builds use Node 24.22.3, npm, Python 3 for UI assembly, and Rust 1.99.1. macOS needs Xcode Command Line Tools, `curl`, `tar` and `unzip`; Windows needs the MSVC C++ build tools/Windows SDK, .NET Framework 4.8 or later, WebView2, Windows PowerShell, `curl.exe` and `tar.exe`. The native targets are `aarch64-apple-darwin`, `x86_64-apple-darwin`, and `x86_64-pc-windows-msvc`. npm and both Cargo graphs use lockfiles. Upstream Node and WASI archives are checksum pinned. The [workflow](../.github/workflows/verify.yml) verifies the Apple Silicon and Windows x64 desktops and the Chromium UI without Docker. Intel Mac builds can be checked locally with the same native toolchain.
 
 ```sh
 npm ci --ignore-scripts --no-audit --no-fund
@@ -43,7 +43,7 @@ Focused regression checks use real Pi sessions with a controlled loopback provid
 node --test tests/manager-recovery.test.ts tests/recovery-http.test.ts tests/tool-failure-budget.test.ts
 ```
 
-The complete workflow also prepares the WASI runtime, runs the host and UI checks, and builds the native application on Apple Silicon, Intel Mac and Windows x64 runners. Windows additionally installs the generated NSIS package in a disposable CI directory, verifies its installed runtime, and requires the uninstaller to remove its installed executables and host resources. This does not assert removal of registry entries, shortcuts or external workspaces. Controlled-provider and DOM checks do not establish real-model quality, native WebView rendering or a user's operating-system installation experience.
+The complete workflow also prepares the WASI runtime, runs the host and UI checks, and builds the native application on Apple Silicon and Windows x64 runners. Windows additionally installs the generated NSIS package in a disposable CI directory, verifies its installed runtime, and requires the uninstaller to remove its installed executables and host resources. This does not assert removal of registry entries, shortcuts or external workspaces. Controlled-provider and DOM checks do not establish real-model quality, native WebView rendering or a user's operating-system installation experience.
 
 ## Distribution review builds
 

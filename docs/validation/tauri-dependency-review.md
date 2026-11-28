@@ -4,7 +4,7 @@
 
 The four build packages in [PR #12](https://github.com/yanaire/athena/pull/12) include codegen that emits `tauri::image::default_window_icon_from_app_icon_resource()` on Windows. Tauri 2.11.6 lacks that function. The [2.12.7 image module](https://github.com/tauri-apps/tauri/blob/tauri-v2.12.7/crates/tauri/src/image/mod.rs) provides it. Tauri 2.12 also adjusts its `available_monitors` implementation for the runtime's `Result` return type.
 
-The locked desktop stack uses Tauri 2.12.7, runtime 2.12.4, runtime-wry 2.12.5, build/codegen/macros 2.7.6, plugin build tooling 2.7.4 and utils 2.10.4. The application still uses dialog 2.7.3, filesystem 2.5.2 and single-instance 2.4.5. Their Tauri constraints accept 2.12.7. The native CI jobs verify the locked builds and installed apps on macOS arm64, macOS x86_64 and Windows x64.
+The locked desktop stack uses Tauri 2.12.7, runtime 2.12.4, runtime-wry 2.12.5, build/codegen/macros 2.7.6, plugin build tooling 2.7.4 and utils 2.10.4. The application still uses dialog 2.7.3, filesystem 2.5.2 and single-instance 2.4.5. Their Tauri constraints accept 2.12.7. At the time of this review, the native CI jobs covered the locked builds and installed apps on macOS arm64, macOS x86_64 and Windows x64.
 
 RustSec identified `cookie` 0.18.2 and `url` 2.5.8 in the desktop lock. The lock now resolves `cookie` 0.18.3 and `url` 2.5.9. `cargo audit --file src-tauri/Cargo.lock` reported zero Vulnerability records after those updates. The audit still reports `glib` under Unsound and separately lists unmaintained dependencies. See the [cookie advisory](https://rustsec.org/advisories/RUSTSEC-2026-0594.html) and [URL advisory](https://rustsec.org/advisories/RUSTSEC-2026-0592.html).
 
