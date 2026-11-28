@@ -63,7 +63,7 @@ export interface WorkspaceSnapshot {
 }
 export interface SessionActivation { sessionId: string; projectId?: string; title?: string; model?: ModelReference; connection?: unknown; snapshot?: WorkspaceSnapshot }
 export interface AthenaTaskManager {
-  capabilities: ('create_project' | 'create_session' | 'open_session' | 'set_project_model' | 'set_project_execution' | 'retry_task' | 'cancel_run' | 'cancel_task' | 'get_agent_history' | 'decide_approval' | 'model_profiles' | 'extensions' | 'research_workflow')[];
+  capabilities: ('create_project' | 'create_session' | 'open_session' | 'background_sessions' | 'set_project_model' | 'set_project_execution' | 'retry_task' | 'cancel_run' | 'cancel_task' | 'get_agent_history' | 'decide_approval' | 'model_profiles' | 'extensions' | 'research_workflow')[];
   getSnapshot(): WorkspaceSnapshot | Promise<WorkspaceSnapshot>;
   subscribe(listener: (snapshot: WorkspaceSnapshot) => void): () => void;
   createProject?(input: { name: string; defaultModel?: ModelReference | null }): Promise<{ project: Project; snapshot?: WorkspaceSnapshot }>;

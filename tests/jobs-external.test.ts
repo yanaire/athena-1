@@ -10,7 +10,7 @@ import { privateTestDirectory } from './platform-test-helpers.ts';
 import { JobRunner } from '../runtime/jobs.ts';
 import type { JobEvent, JobRunnerOptions, ExternalMcpJob } from '../runtime/jobs.ts';
 import { ExtensionStore } from '../runtime/extensions.ts';
-import { discoverExternalMcp } from '../runtime/external-mcp-client.ts';
+import { discoverExternalMcp, isTransientExternalConnectionError, probePinnedExternalMcp } from '../runtime/external-mcp-client.ts';
 import type { ExternalServerDefinition } from '../runtime/external-mcp-client.ts';
 import { Storage } from '../runtime/storage.ts';
 
@@ -21,11 +21,13 @@ async function fixture(t: TestContext, options: Omit<JobRunnerOptions, 'dataDir'
   const storage = new Storage(dataDir), extensions = new ExtensionStore(storage);
   let respond: ((res: ServerResponse, message: { id: number; params: { arguments: { value: number } } }) => void) | undefined;
   let deleted: ((res: ServerResponse) => void) | undefined;
+  let discoveryResponse: ((res: ServerResponse) => void) | undefined;
   const requests: string[] = [];
   const http = createServer(async (req, res) => {
     if (req.method === 'DELETE') { if (deleted) deleted(res); else res.writeHead(202).end(); return; }
     const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(Buffer.from(chunk));
     const message = JSON.parse(Buffer.concat(chunks).toString()); requests.push(message.method);
+    if (message.method === 'initialize' && discoveryResponse) { discoveryResponse(res); return; }
     if (message.method.startsWith('notifications/')) { res.writeHead(202).end(); return; }
     res.setHeader('Content-Type', 'application/json');
     let result: unknown;
@@ -55,8 +57,29 @@ async function fixture(t: TestContext, options: Omit<JobRunnerOptions, 'dataDir'
   });
   const input: ExternalMcpJob = { ...identity, server, tool: 'double', arguments: { value: 7 } };
   return { runner, make, input, dataDir, extensions, requests,
-    respond(next: typeof respond) { respond = next; }, onDelete(next: typeof deleted) { deleted = next; } };
+    respond(next: typeof respond) { respond = next; }, onDiscovery(next: typeof discoveryResponse) { discoveryResponse = next; },
+    onDelete(next: typeof deleted) { deleted = next; } };
 }
+
+test('only transport failures before dispatch can resume when the pinned connection returns', async t => {
+  const f = await fixture(t);
+  const probe = () => probePinnedExternalMcp(f.input.server.definition, f.input.server.verification);
+  for (const failure of ['socket', 503, 401] as const) {
+    f.onDiscovery(res => { if (failure === 'socket') res.destroy(); else res.writeHead(failure).end(); });
+    const failed = await f.runner.startExternal({ ...f.input, attemptId: String(failure) }).result;
+    assert.equal(failed.externalFailure, failure === 401 ? 'blocked' : 'connection');
+    await assert.rejects(probe(), err => isTransientExternalConnectionError(err) === (failure !== 401));
+  }
+  f.onDiscovery(undefined);
+  await probe();
+  assert.equal(f.requests.filter(method => method === 'tools/call').length, 0);
+  f.respond(res => res.destroy());
+  const unknown = await f.runner.startExternal({ ...f.input, attemptId: 'lost-response' }).result;
+  assert.equal(unknown.status, 'failed');
+  assert.equal(unknown.externalFailure, 'outcome_unknown');
+  await probe();
+  assert.equal(f.requests.filter(method => method === 'tools/call').length, 1);
+});
 
 test('external, CSV and RC jobs share one queue; actual result bytes and old receipts survive uninstall/restart', { timeout: 10000 }, async t => {
   const events: JobEvent[] = [], f = await fixture(t, { concurrency: 1, onEvent: event => events.push(event) });
@@ -96,8 +119,10 @@ test('external cancellation and timeout preserve uncertain remote state and publ
   const result = await cancelled.result;
   assert.equal(result.status, 'cancelled'); assert.equal(result.cancellation, 'unknown'); assert.equal(result.artifact, undefined);
   assert.match(result.error ?? '', /may still have completed/);
+  assert.equal(result.externalFailure, 'outcome_unknown');
   const timeout = await f.runner.startExternal({ ...f.input, attemptId: 'timeout' }).result;
   assert.equal(timeout.status, 'timed_out'); assert.equal(timeout.cancellation, 'unknown'); assert.equal(timeout.artifact, undefined);
+  assert.equal(timeout.externalFailure, 'outcome_unknown');
   assert.ok(f.requests.includes('notifications/cancelled'));
 });
 
@@ -124,6 +149,7 @@ test('failed external results and terminal persistence failures never return a p
   f.respond((res, msg) => res.end(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { isError: true, content: [{ type: 'text', text: 'Controlled remote rejection' }] } })));
   const rejected = await f.runner.startExternal({ ...f.input, attemptId: 'rejected' }).result;
   assert.equal(rejected.status, 'failed'); assert.equal(rejected.artifact, undefined); assert.match(rejected.error ?? '', /Controlled remote rejection/);
+  assert.equal(rejected.externalFailure, 'tool_error');
   f.respond(undefined);
   const next = await f.runner.startExternal({ ...f.input, attemptId: 'next' }).result;
   assert.equal(next.status, 'succeeded', next.error);
@@ -140,5 +166,37 @@ test('interrupted external attempts restore once as interrupted without network 
   await new Promise<void>(resolve => queueMicrotask(resolve));
   assert.equal(restored.length, 1); assert.equal(restored[0]?.attempt.status, 'interrupted'); assert.equal(restored[0]?.attempt.cancellation, 'unknown');
   assert.equal(restored[0]?.attempt.artifact, undefined); assert.equal(f.requests.length, before);
+  assert.equal(restored[0]?.attempt.externalFailure, 'outcome_unknown');
   assert.throws(() => restarted.startExternal(f.input), { code: 'DUPLICATE_ATTEMPT' });
+});
+
+test('crash during discovery is safe to resume only with a durable pre-dispatch receipt', async t=>{
+  const events:JobEvent[]=[];
+  const f=await fixture(t,{onEvent:event=>events.push(event)});
+  const reached=Promise.withResolvers<void>();
+  f.onDiscovery(()=>reached.resolve());
+  const handle=f.runner.startExternal(f.input); await reached.promise;
+  const active=events.at(-1)!.attempt;
+  assert.equal(active.externalDispatch,'pending');
+  await f.runner.close(); await handle.result;
+  const restored:JobEvent[]=[];
+  const legacy={...active,attemptId:'old',externalDispatch:undefined};
+  f.make({recoveredAttempts:[active,legacy],onEvent:event=>restored.push(event)});
+  await new Promise<void>(resolve=>queueMicrotask(resolve));
+  assert.deepEqual(restored.map(({attempt})=>[attempt.externalFailure,attempt.cancellation]),[
+    ['connection','confirmed'],['outcome_unknown','unknown']
+  ]);
+  assert.ok(!f.requests.includes('tools/call'));
+});
+
+test('a failing dispatch journal prevents the external operation from starting', async t=>{
+  const f=await fixture(t,{onEvent(event){
+    if(event.type==='process_output' && event.attempt.externalDispatch==='dispatching')throw Error('Dispatch journal unavailable');
+  }});
+  const result=await f.runner.startExternal(f.input).result;
+  assert.equal(result.status,'failed');
+  assert.equal(result.externalDispatch,'pending');
+  assert.equal(result.externalFailure,'blocked');
+  assert.match(result.error??'',/Dispatch journal unavailable/);
+  assert.ok(!f.requests.includes('tools/call'));
 });

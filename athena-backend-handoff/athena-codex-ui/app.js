@@ -12,6 +12,7 @@
  let piHistoryAfterSettle=-1;
  let piRuntime=null,piWorkbench=null,piRuntimeSubscription=null,piEventSubscription=null,piManualView=null,piSessionIdentity='',piCommandSignature='',piWidgetSignature='',piHistorySignature='',piSubmitting=false,piDraftOffer='',piDraftSeen='',piTurnEpoch=0,piSubmittedContext=null;
  const piManualTools=new Map(), sessionDrafts=new Map();
+ let piTaskManagerSessionId=null;
  const failedDrafts=[];
  let paperPanel, researchFlow, shownResearchSession=null,currentResearchStage='';
  let projectSignature='', activeProjectId='project-rc', activeDocumentId='research-note', requestedDocumentVersion=null, lifecyclePending=false, nativeSessionTransition=null;
@@ -100,6 +101,13 @@
   return focusWillHide;
  }
  function openPanel(tab=state.panelTab,artifact=null,from=null){
+  const researchTabs={workflow:'progress',results:'results',manuscript:'preview'};
+  if(!artifact && !q('#ac-flow-nav').hidden && researchTabs[tab]){
+   showPanel(from);const moveFocus=selectSideView('research','Research');
+   q('#ac-view-manuscript').dataset.editorOpen='false';panelTab('manuscript');researchFlow?.select(researchTabs[tab]);
+   layout?.refresh();overlay();if(moveFocus || root.dataset.panelLayout==='overlay')q('#ac-flow-nav [aria-pressed="true"]')?.focus({preventScroll:true});
+   return;
+  }
   if(tab==='results'&&workspaceStore?.getState().mode==='runtime'){openWorkspace('artifacts',artifact?{artifactId:artifact}:null,from);return;}
   if(tab==='workflow'){openWorkspace('workflow',null,from);return}
   showPanel(from);const moveFocus=selectSideView('research','Research');
@@ -115,7 +123,11 @@
   layout?.refresh();overlay();surfaces?.open(id,!q('#ac-research-panel').inert);announce('Side view opened.');
  }
  function openWorkspace(view='workflow',selection=null,from=null){
-  if(view==='manuscript'){openDocument(selection||{});openPanel('manuscript',null,from);return;}
+  if(view==='manuscript'){
+   openPanel('manuscript',null,from);
+   if(selection?.documentId)q('#ac-view-manuscript').dataset.editorOpen='true';
+   openDocument(selection||{});return;
+  }
   if(view==='execution'){
    composer.closeMenu?.();closePanel(false);overlay();
    const toolId=selection?.toolId;
@@ -219,6 +231,7 @@
   toast('PDF export confirmed for '+result.documentId+' · v'+result.version+'.');
  }
  function renderWorkspace(snapshot){
+  if(failedDrafts.length)renderUnsent(snapshot.sessionId);
   const previousSession=root.dataset.sessionId;
   if(snapshot.mode==='runtime'&&previousSession&&snapshot.sessionId!==previousSession&&(snapshot.sessionId||snapshot.taskManagerConnected)&&!lifecyclePending){
    sessionDrafts.set(previousSession,composer.captureDraft());preservePendingSubmission('The workspace switched conversations.');resetPiActivity();
@@ -227,10 +240,11 @@
   }
   const live=snapshot.mode==='runtime';root.dataset.workspaceMode=snapshot.mode;root.dataset.sessionBound=String(snapshot.sessionBound!==false);
   paperPanel?.scope(snapshot);researchFlow?.scope(snapshot);
-  const guided=snapshot.projects?.some(p=>p.id===snapshot.projectId&&p.researchWorkflow)&&!!snapshot.sessionId;
+  const guided=live && !!snapshot.projectId && !!snapshot.sessionId;
+  q('#ac-flow-nav').hidden=!guided;
   q('#ac-view-manuscript').dataset.guided=String(!!guided);
   if(guided&&shownResearchSession!==snapshot.sessionId){
-    shownResearchSession=snapshot.sessionId;q('#ac-view-manuscript').dataset.editorOpen='false';openPanel('manuscript');
+    shownResearchSession=snapshot.sessionId;openPanel('workflow');
   }
   if(live){q('#ac-doc-evidence').hidden=true;q('[data-action="export-manuscript"]').hidden=true;}
   surfaces?.setRuntimeMode?.(live);
@@ -326,7 +340,10 @@
   }finally{lifecyclePending=false;}
  }
  async function openResearchSession(sessionId){
-  if(lifecyclePending||piSubmitting||nativeSessionTransition||state.busy){toast('Wait for the current operation to finish.');return;}
+  const workspace=workspaceStore.getState(),pi=piRuntime.getState();
+  if(sessionId===workspace.sessionId&&workspace.sessionBound!==false&&pi.connected)return;
+  const canBrowseWhileRunning=workspace.capabilities?.backgroundSessions&&workspace.sessionId&&piTaskManagerSessionId===workspace.sessionId;
+  if(lifecyclePending||piSubmitting||piSubmittedContext||nativeSessionTransition||(!canBrowseWhileRunning&&(state.busy||pi.session.isStreaming))){toast('Wait for the current operation to finish.');return;}
   lifecyclePending=true;rememberDraft();
   try{activateSession(await workspaceStore.openSession(sessionId));}catch(error){toast(String(error.message||error));}finally{lifecyclePending=false;}
  }
@@ -398,8 +415,13 @@
  }
  function sameDraftContext(files,mentions){return files.length===composer.getAttachments().length&&files.every((file,i)=>file===composer.getAttachments()[i])&&JSON.stringify(mentions.map(m=>m.id))===JSON.stringify(composer.getSelections().map(m=>m.id))}
  function keepUnsent(draft,reason){
-  failedDrafts.push({value:draft.value,attachments:[...draft.attachments],mentions:[...draft.mentions],sessionId:draft.sessionId||null,reason});
-  q('#ac-unsent-draft').hidden=false;q('#ac-unsent-draft span').textContent=failedDrafts.length+' unsent message'+(failedDrafts.length===1?' is':'s are')+' kept with attachments.';
+  failedDrafts.push({value:draft.value,attachments:[...draft.attachments],mentions:[...draft.mentions],sessionId:draft.sessionId||null,
+   scoped:!!draft.sessionId&&workspaceStore.getState().capabilities?.backgroundSessions,reason});
+  renderUnsent(workspaceStore.getState().sessionId);
+ }
+ function renderUnsent(sessionId){
+  const available=failedDrafts.filter(draft=>!draft.scoped||draft.sessionId===sessionId);
+  q('#ac-unsent-draft').hidden=!available.length;q('#ac-unsent-draft span').textContent=available.length+' unsent message'+(available.length===1?' is':'s are')+' kept with attachments.';
  }
  function preservePendingSubmission(reason){if(!piSubmittedContext)return;const pending=piSubmittedContext;piSubmittedContext=null;keepUnsent(pending,reason);}
  function conversationBinding(){const workspace=workspaceStore?.getState();return {projectId:workspace?.projectId||null,sessionId:workspace?.sessionId||null,piSessionId:piRuntime.getState().session.sessionId||piRuntime.getState().session.id||null};}
@@ -598,6 +620,7 @@
   piActivity.receive(event);
  }
  function detachPiSession(){
+  piTaskManagerSessionId=null;
   preservePendingSubmission('The model disconnected before accepting this message.');nativeSessionTransition=null;piSessionEpoch+=1;piTurnEpoch++;
   piSessionUnsubscribe?.();piSessionUnsubscribe=null;piSession=null;
   if(piEngaged&&!piPreviewActive){reply.stop();state.busy=false;composer.setBusy(false)}
@@ -610,6 +633,7 @@
   piView?.clear?.();q('#ac-pi-transcript').hidden=true;piHistorySignature='';q('#ac-live-user').hidden=true;q('#ac-live-reply').hidden=true;piManualTools.clear();piManualView.reset();
   const epoch=++piSessionEpoch;
   const binding=piRuntime.attach(session,options);piSession=binding.session;piSessionUnsubscribe=binding.detach;
+  piTaskManagerSessionId=session.taskManagerSessionId||null;
   const current=piSession;
   return ()=>piSession===current&&piSessionEpoch===epoch?detachPiSession():false;
  }
@@ -666,8 +690,8 @@
    toast(finished?'Preview: the existing run is complete.':'Preview: the existing run was checked. No new calculation was submitted.');
   },800);
  }
- listen(root,'click',e=>{const b=e.target.closest('button');if(!b||!root.contains(b)||b.disabled)return;if(b.dataset.openSession){openResearchSession(b.dataset.openSession);return;}if(b.dataset.open){if(b.hasAttribute('data-search-result'))closeDialog();openPanel(b.dataset.open,b.dataset.artifact||null,b);return}if(b.dataset.panelTab){if(b.dataset.panelTab==='workflow')openWorkspace('workflow',null,b);else panelTab(b.dataset.panelTab);return}if(b.dataset.workspaceView){openWorkspace(b.dataset.workspaceView,null,b);return}if(b.dataset.workspaceArtifact){openWorkspace('artifacts',{artifactId:b.dataset.workspaceArtifact},b);return}const action=b.dataset.action;if(!action)return;
-  if(action==='toggle-panel'){if(state.panelOpen)closePanel(false);else{const view=settings?.getState().defaultSideView||'home';view==='research'?openPanel(state.panelTab,null,b):openSurface(view,b)}return}if(action==='surface-home'){openSurface('home',b);return}if(action==='toggle-left'){toggleLeft();return}if(action==='open-file'){openSurface('files',b);surfaces?.openFile?.(b.dataset.file);return}if(action==='close-dialog'){closeDialog();return}if(action==='reconcile'){reconcile();return}
+ listen(root,'click',e=>{const b=e.target.closest('button');if(!b||!root.contains(b)||b.disabled)return;if(b.dataset.flowTab){openPanel(({progress:'workflow',results:'results',preview:'manuscript'})[b.dataset.flowTab],null,b);return;}if(b.dataset.openSession){openResearchSession(b.dataset.openSession);return;}if(b.dataset.open){if(b.hasAttribute('data-search-result'))closeDialog();openPanel(b.dataset.open,b.dataset.artifact||null,b);return}if(b.dataset.panelTab){if(b.dataset.panelTab==='workflow')openWorkspace('workflow',null,b);else panelTab(b.dataset.panelTab);return}if(b.dataset.workspaceView){openWorkspace(b.dataset.workspaceView,null,b);return}if(b.dataset.workspaceArtifact){openWorkspace('artifacts',{artifactId:b.dataset.workspaceArtifact},b);return}const action=b.dataset.action;if(!action)return;
+  if(action==='toggle-panel'){if(state.panelOpen)closePanel(false);else if(!q('#ac-flow-nav').hidden){q('#ac-flow-nav [aria-pressed="true"]').click();}else{const view=settings?.getState().defaultSideView||'home';view==='research'?openPanel(state.panelTab,null,b):openSurface(view,b)}return}if(action==='surface-home'){openSurface('home',b);return}if(action==='toggle-left'){toggleLeft();return}if(action==='open-file'){openSurface('files',b);surfaces?.openFile?.(b.dataset.file);return}if(action==='close-dialog'){closeDialog();return}if(action==='reconcile'){reconcile();return}
   if(action==='open-claim'){openPanel('results','response',b);return}
   if(action==='edit-manuscript'){
    const doc=records.getDocument(activeDocumentId);if(!doc||doc.selectedVersion!==doc.currentVersion){toast('Select the latest document version to edit.');return;}
@@ -693,9 +717,10 @@
   if(action==='new-research'){requestResearch();return;}
   if(action==='current-draft'){closeDialog();composer.focus();return;}
   if(action==='restore-unsent'){
-   const failed=failedDrafts.shift();if(!failed)return;const current=composer.captureDraft();
+   const sessionId=workspaceStore.getState().sessionId,index=failedDrafts.findIndex(d=>!d.scoped||d.sessionId===sessionId);
+   if(index<0)return;const [failed]=failedDrafts.splice(index,1),current=composer.captureDraft();
    composer.restoreDraft({value:failed.value+(current.value?'\n\n'+current.value:''),attachments:[...failed.attachments,...current.attachments],mentions:[...failed.mentions,...current.mentions]});
-   q('#ac-unsent-draft').hidden=!failedDrafts.length;q('#ac-unsent-draft span').textContent=failedDrafts.length+' unsent messages remain.';return;
+   renderUnsent(sessionId);return;
   }
   if(action==='notes'){openPanel('manuscript',null,b);return}if(action==='copy-response'){const text=q('.ac-response').innerText;if(navigator.clipboard?.writeText)navigator.clipboard.writeText(text).then(()=>toast('Response copied.')).catch(()=>toast('Clipboard access is unavailable in this environment.'));else toast('Clipboard access is unavailable in this environment.');return}
   if(action==='current-thread'){return}
@@ -758,7 +783,7 @@ const dialogOpen=!q('#ac-dialog-backdrop').hidden;const rightOverlay=state.panel
  chatModelPicker=window.AthenaChatModelPicker.mount(q('#ac-model-picker-slot'),{runtime:piRuntime,preferences:modelConfig,icons,announce,isBusy:()=>state.busy||piSubmitting||lifecyclePending||Boolean(nativeSessionTransition),isSessionBound:()=>workspaceStore.getState().sessionBound!==false,isUnavailable:()=>q('#ac-conversation').inert,beforeOpen(){composer.closeMenu?.();command?.close?.(false)},onOpenSettings(){piSession?openPi('model'):openSettings('models')}});
  workspaceStore.configure?.({parallelLimit:modelConfig.parallelLimit});
  piWorkbench=window.AthenaPiWorkbench.mount(q('#ast-pi-workbench-slot'),{runtime:piRuntime,icons,toast,onDraft:usePiDraft,onSectionChange:section=>settings?.routeRuntime(section),onModalChange(){overlay()}});
- researchFlow=window.AthenaResearchFlow?.mount(q('#ac-research-flow'),{open:openWorkspace,editor:async id=>{q('#ac-view-manuscript').dataset.editorOpen='true';await paperPanel?.select(id);q('#ac-paper-project').scrollIntoView({block:'start'});},stage:text=>{currentResearchStage=text;const e=q('#ac-flow-stage');if(e)e.textContent=text;}});
+ researchFlow=window.AthenaResearchFlow?.mount(q('#ac-research-flow'),{nav:q('#ac-flow-nav'),open:openWorkspace,editor:async id=>{q('#ac-view-manuscript').dataset.editorOpen='true';await paperPanel?.select(id);q('#ac-paper-project').scrollIntoView({block:'start'});},stage:text=>{currentResearchStage=text;const e=q('#ac-flow-stage');if(e)e.textContent=text;}});
  paperPanel=window.AthenaManuscripts?.mount(q('#ac-paper-project'),{open:(documentId,version)=>openDocument({documentId,version}),cancel:id=>workspaceStore.cancel(id)});
  mountDocumentToolbar();
  recordsOff=records.subscribe(renderDocumentRecord);

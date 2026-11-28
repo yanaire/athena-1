@@ -138,7 +138,7 @@ async function rpc(method: string, args: unknown[]) {
   switch (method) {
     case 'bibliographyHistory':case 'authorizeSearch':case 'executeSearch':case 'cancelSearch':case 'addSearchSource':
     case 'listPapers':case 'createPaper':case 'addPaperSource':case 'getDocument':case 'saveDocument':
-    case 'listLibrarySources':case 'searchAndSavePapers':case 'researchFlow':case 'researchTableInputs':case 'resumeResearch':case 'compilePaper':case 'exportPaper':case 'paperDetails':case 'setPaperOutline':case 'startPaper':
+    case 'listLibrarySources':case 'searchAndSavePapers':case 'researchFlow':case 'researchTableInputs':case 'resumeResearch':case 'stopResearch':case 'compilePaper':case 'exportPaper':case 'paperDetails':case 'setPaperOutline':case 'startPaper':
       if(!object(input))throw new TypeError('Expected manuscript request.');
       return manager.paperRequest(method,input);
     case 'chooseProjectFolder': if(!desktop)throw Error('Use the local path field in browser mode.');return chooseProjectFolder();

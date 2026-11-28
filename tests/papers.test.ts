@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { rmSync } from 'node:fs';
+import { rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { hash } from '../runtime/orchestration.ts';
 import { Storage } from '../runtime/storage.ts';
-import { Papers, inspectLinks, manuscriptSectionChecks } from '../runtime/papers.ts';
+import { Papers, inspectLinks, manuscriptSectionChecks, type PaperRun } from '../runtime/papers.ts';
 import { privateTestDirectory } from './platform-test-helpers.ts';
 
 test('paper source and version references are project-bound and missing evidence is retained', t=>{
@@ -49,4 +50,57 @@ test('saved section checks use Markdown heading boundaries and exact quote offse
   assert.deepEqual(manuscriptSectionChecks({text,title:'Original project title',links}),[
     {heading:'Methods',linkedPassages:1},{heading:'Results',linkedPassages:1},
     {heading:'Sensitivity',linkedPassages:1},{heading:'Results',linkedPassages:1}]);
+});
+
+test('research manuscript recovery follows its exact independent review and the typesetter diagnostic',async t=>{
+  const dir=privateTestDirectory(join(tmpdir(),'paper-recovery-')),db=new Storage(dir),papers=new Papers(db);
+  t.after(()=>{db.close();rmSync(dir,{recursive:true,force:true});});
+  const project='project',session='session';
+  db.putProject({id:project,name:'Project'});
+  db.putSession({id:session,projectId:project,title:'Research',sessionDir:dir,sessionFile:join(dir,'main.jsonl')});
+  const src=papers.saveSource(project,'Measurements','Voltage 19 mV');
+  const paper=papers.create(project,{title:'Measurements',goal:'Check voltage',outline:['Results'],evidence:[src]},
+    {runId:'study',sessionId:session,reviewId:'experiment-review',template:'article'});
+  const context={projectId:project,sessionId:session,runId:'write',taskId:'parent',attemptId:'parent-1',agentSessionId:session,parentTaskId:null};
+  const reviewer={...context,taskId:'reviewer',attemptId:'review-1',parentTaskId:'parent',agentSessionId:'independent'};
+  const writing:PaperRun={id:context.runId,requestId:'write',mode:'write',context,baseVersion:null,stage:'Independent review',
+    outline:paper.outline,sections:[],attempts:[],versions:[],reviews:[],uploads:[]};
+  papers.update(project,paper.id,d=>{d.runs.push(writing);});
+  const body='# Results\nVoltage 19 mV\n![plot](unavailable.png)';
+  const artifact={kind:'artifact' as const,id:'draft',projectId:project,sessionId:session,version:'v1',sha256:hash(body),bytes:body.length};
+  const v=papers.save(project,paper.id,{title:paper.title,text:body,evidence:[src],expectedCurrentVersion:null},{runId:writing.id,artifact,links:[]});
+  const decide=()=>{const d=papers.paper(project,paper.id);return papers.recovery(d,d.runs[0]!);};
+  assert.deepEqual(await decide(),{action:'resume'});
+  papers.update(project,paper.id,d=>{d.runs[0]!.reviews.push({id:'review',missionId:'mission',evidenceIds:['outputs'],targets:[artifact],
+    question:'Assess source coverage',createdAt:Date.now(),requestedBy:context,reviewer,state:'completed',verdict:'insufficient_evidence',findings:['Measure a second condition.']});});
+  assert.equal((await decide()).action,'wait');
+  db.putRecord('attempt',{id:reviewer.attemptId,...reviewer,status:'succeeded'});
+  const missing=await decide();assert.equal(missing.action,'evidence');assert.match(missing.reason,/second condition/);
+  papers.update(project,paper.id,d=>{const run=d.runs[0]!;run.reviews[0]={...run.reviews[0]!,verdict:'changes_required'};});
+  const revise={action:'revise',version:v.version,reviewId:'review'};
+  assert.deepEqual(await decide(),revise);
+  papers.update(project,paper.id,d=>{const run=d.runs[0]!;run.reviews[0]={...run.reviews[0]!,verdict:'supported'};});
+  assert.deepEqual(await decide(),{action:'resume'});
+  await assert.rejects(papers.compile(project,session,paper.id,v.version,'article',new AbortController().signal),/unstaged figure/);
+  assert.deepEqual(await decide(),revise);
+  if(process.platform==='linux'){
+    const key='papers.v1:'+JSON.stringify([project,'typeset',JSON.stringify([paper.id,v.version])]);
+    const compiled=papers.compilation(project,paper.id,v.version)!;
+    db.set(key,{...compiled,repair:undefined,error:'spawn pdflatex ENOENT'});
+    const previous=process.env.PATH;
+    try{
+      process.env.PATH=dir;
+      assert.deepEqual(await decide(),{action:'wait',poll:true,reason:'spawn pdflatex ENOENT'});
+      // The availability probe only checks the executable bit. No compiler invocation or model work is permitted during the wait.
+      writeFileSync(join(dir,'pdflatex'),'');chmodSync(join(dir,'pdflatex'),0o700);
+      assert.deepEqual(await decide(),{action:'resume'});
+    }finally{
+      if(previous===undefined)delete process.env.PATH;else process.env.PATH=previous;
+    }
+  }
+  const current=papers.paper(project,paper.id);
+  const correction={...writing,baseVersion:v.version,revisionReviewId:'review',versions:[]};
+  assert.deepEqual(await papers.recovery(current,correction),{action:'resume'});
+  papers.save(project,paper.id,{title:paper.title,text:'Manually edited',evidence:[src],expectedCurrentVersion:v.version});
+  assert.equal((await decide()).action,'wait');
 });

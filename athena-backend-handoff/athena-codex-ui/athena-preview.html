@@ -2689,6 +2689,59 @@ html[data-athena-hosted="true"] #athena-codex:not([data-workspace-mode]) #ac-pi-
 #ac-view-manuscript[data-guided=true][data-editor-open=false]>:not(#ac-research-flow){display:none}
 #ac-live-projects small.ac-project-empty{display:block;overflow-wrap:anywhere}
 
+#athena-codex #ac-flow-nav{display:flex;gap:4px;align-items:stretch;padding:0 12px;border-bottom:1px solid var(--ac-line);flex-shrink:0}
+#athena-codex #ac-flow-nav button{min-height:42px;padding:6px 8px;font-size:12px;line-height:1.35;color:#666958;flex:1;overflow-wrap:anywhere}
+#athena-codex #ac-flow-nav button[aria-pressed=true]{font-weight:650;color:#343c2f;box-shadow:inset 0 -2px #557054}
+#athena-codex #ac-flow-nav:not([hidden])~.aw-side-nav,
+#athena-codex #ac-flow-nav:not([hidden])~#ac-research-slot>.ac-panel-tabs{display:none}
+#athena-codex #ac-research-flow{margin:0;padding:0;border:0}
+#athena-codex .ac-project-graph{border-block:1px solid var(--ac-line);padding:9px 0;margin-bottom:12px}
+#athena-codex .ac-project-graph summary{cursor:pointer;font-weight:600}
+#athena-codex .ac-project-graph>section{margin:12px 0;max-height:50vh;overflow:auto;overflow-wrap:anywhere}
+#athena-codex .ac-project-graph h4{font-weight:600;font-size:14px;line-height:1.4;margin:8px 0}
+#athena-codex .ac-project-graph a{display:block;padding:4px 0}
+#athena-codex .ac-graph-branch{margin:10px 0 10px 5px}
+#athena-codex .ac-graph-branch ul{list-style:none;margin:4px 0 0 3px;border-left:1px solid #afb9aa;padding-left:0}
+#athena-codex .ac-graph-branch li{display:flex;align-items:center;margin:0;padding:3px 0}
+#athena-codex .ac-graph-branch li::before{content:'';flex:0 0 12px;border-bottom:1px solid #afb9aa}
+#athena-codex .ac-graph-branch button{border:1px solid #d8ddd4;border-radius:7px;padding:4px 8px;text-align:left;background:#f7f8f3;overflow-wrap:anywhere}
+#athena-codex .ac-graph-branch button:hover{background:#ecf0e7}
+
+#athena-codex .ac-knowledge-map{
+  --ac-map-gap:clamp(30px,12%,64px);
+  --ac-map-column:calc((100% - var(--ac-map-gap)) / 2);
+  padding:2px 1px;
+}
+#athena-codex .ac-map-heading,#athena-codex .ac-map-columns{
+  display:grid;grid-template-columns:var(--ac-map-column) var(--ac-map-column);justify-content:space-between;
+}
+#athena-codex .ac-map-heading small,#athena-codex .ac-map-isolated>small{
+  color:var(--ac-muted,#66695d);font-size:11px;font-weight:600;line-height:1.45;
+}
+#athena-codex .ac-map-network{position:relative;isolation:isolate}
+#athena-codex .ac-map-links{
+  position:absolute;left:var(--ac-map-column);top:0;height:100%;width:var(--ac-map-gap);overflow:visible;pointer-events:none;
+}
+#athena-codex .ac-map-links path{fill:none;stroke:#829881;stroke-width:1.6px}
+#athena-codex .ac-project-graph .ac-map-node{
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;box-sizing:border-box;
+  border:1px solid #bdcab9;border-radius:8px;background:#eef3e9;color:#344931;
+  margin:0;padding:7px 9px;min-height:32px;max-height:50px;overflow:hidden;
+  font:inherit;font-size:12px;font-weight:550;line-height:1.45;text-align:left;cursor:pointer;overflow-wrap:anywhere;
+}
+#athena-codex .ac-map-network .ac-map-node{position:absolute;width:var(--ac-map-column);transform:translateY(-50%)}
+#athena-codex .ac-map-network .ac-map-paper{left:0}
+#athena-codex .ac-map-network .ac-map-source{right:0}
+#athena-codex .ac-project-graph .ac-map-source{border-color:#cbd0c2;background:#faf9f3;color:#474c3e}
+#athena-codex .ac-map-tracing path:not(.ac-map-related){opacity:.25}
+#athena-codex .ac-map-tracing path.ac-map-related{stroke:#486b47;stroke-width:2.3px}
+#athena-codex .ac-project-graph .ac-map-node.ac-map-related{border-color:#708b6a}
+#athena-codex .ac-project-graph .ac-map-node:focus-visible{outline:2px solid #466944;outline-offset:1px}
+#athena-codex .ac-map-isolated{border-top:1px dashed var(--ac-line,#cdd2c7);padding:8px 0 2px}
+#athena-codex .ac-map-isolated>small{display:block;margin-bottom:5px}
+#athena-codex .ac-map-columns>div{display:grid;align-content:start;gap:6px}
+#athena-codex .ac-map-isolated .ac-map-node{border-style:dashed;width:100%}
+
 </style>
 </head>
 <body>
@@ -2780,6 +2833,11 @@ html[data-athena-hosted="true"] #athena-codex:not([data-workspace-mode]) #ac-pi-
         <div class="ac-panel-heading">
           <button type="button" class="ac-side-picker cursor-interaction" id="ac-side-picker" data-action="surface-home" aria-label="Choose a surface"><i data-lucide="panels-top-left" aria-hidden="true"></i><span id="ac-side-title">Surfaces</span><i data-lucide="chevron-down" aria-hidden="true"></i></button>
         </div>
+        <nav id="ac-flow-nav" aria-label="Research views" hidden>
+          <button type="button" data-flow-tab="progress" aria-pressed="true">Workflow</button>
+          <button type="button" data-flow-tab="results" aria-pressed="false">Experiment results</button>
+          <button type="button" data-flow-tab="preview" aria-pressed="false">Paper</button>
+        </nav>
         <nav class="aw-side-nav" aria-label="Research workspace views">
           <button type="button" class="ac-icon-button cursor-interaction" data-workspace-view="workflow" aria-label="Workflow" data-morph-tooltip="Workflow"><i data-lucide="workflow" aria-hidden="true"></i></button>
           <button type="button" class="ac-icon-button cursor-interaction" data-workspace-view="artifacts" aria-label="Artifacts" data-morph-tooltip="Artifacts"><i data-lucide="panels-top-left" aria-hidden="true"></i></button>
@@ -2812,7 +2870,6 @@ html[data-athena-hosted="true"] #athena-codex:not([data-workspace-mode]) #ac-pi-
         </section>
         <section class="ac-panel-body" id="ac-view-manuscript" role="tabpanel" aria-labelledby="ac-tab-manuscript" hidden>
           <section id="ac-research-flow" class="ac-paper-project" hidden aria-label="Research workflow">
-            <div><button data-flow-tab="progress" aria-pressed="true">Research progress</button><button data-flow-tab="preview" aria-pressed="false">Manuscript preview</button></div>
             <div data-flow-body></div><p data-flow-notice role="status"></p>
           </section>
           <section id="ac-paper-project" class="ac-paper-project" aria-label="Manuscript workspace" hidden>
@@ -6303,7 +6360,7 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         events: [...live.events.filter(inScope), ...observedEvents.filter(inScope)].filter((item, index, all) => all.findIndex(other => other.id === item.id) === index),
         retryOperations: workspaceBound ? Object.fromEntries([...retryOperations.values()].filter(item => inScope(item) && item.runId === live.run.id && (item.pending || live.tasks.some(task => task.id === item.taskId && task.attemptId === item.expectedAttemptId))).map(({ taskId, expectedAttemptId, requestId, pending, accepted, error }) => [taskId, { expectedAttemptId, requestId, pending, accepted, error }])) : {},
         modelScopes: { appDefault, projectDefault: model(project?.defaultModel), conversation: sessionBound && model(pi.model) ? { ...model(pi.model), thinkingLevel: pi.thinkingLevel } : null, runLocked: host && workspaceBound ? live.run?.model : sessionBound ? lockedModel : null },
-        capabilities: { createProject: available('create_project', 'createProject'), createSession: available('create_session', 'createSession'), openSession: available('open_session', 'openSession'), setProjectModel: Boolean(projectId) && available('set_project_model', 'setProjectDefaultModel'), retryTask: workspaceBound && available('retry_task', 'retryTask'), cancelRun: workspaceBound && available('cancel_run', 'cancelRun'), cancelTask: workspaceBound && available('cancel_task', 'cancelTask'), agentHistory: workspaceBound && available('get_agent_history', 'getAgentHistory'), decideApproval: workspaceBound && available('decide_approval', 'decideApproval') }
+        capabilities: { createProject: available('create_project', 'createProject'), createSession: available('create_session', 'createSession'), openSession: available('open_session', 'openSession'), backgroundSessions: available('background_sessions','openSession'), setProjectModel: Boolean(projectId) && available('set_project_model', 'setProjectDefaultModel'), retryTask: workspaceBound && available('retry_task', 'retryTask'), cancelRun: workspaceBound && available('cancel_run', 'cancelRun'), cancelTask: workspaceBound && available('cancel_task', 'cancelTask'), agentHistory: workspaceBound && available('get_agent_history', 'getAgentHistory'), decideApproval: workspaceBound && available('decide_approval', 'decideApproval') }
       });
     }
     function publish() { if (!destroyed) { const state = getState(); for (const fn of listeners) fn(state); } }
@@ -6957,15 +7014,181 @@ window.AthenaManuscripts = {mount(root, options) {
 
 </script>
 <script>
-// The host owns transitions. This panel only reads receipts and invokes explicit recovery.
+// Traverse project membership and the exact source editions assigned to a manuscript.
+window.AthenaProjectGraph={create({load,openPaper}){
+  const el=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
+  const button=(label,action)=>{const b=el('button',label);b.type='button';b.onclick=action;return b;};
+  const element=el('details'),body=el('section');
+  element.dataset.disclosure='project-library';element.className='ac-project-graph';
+  element.append(el('summary','Project knowledge graph'),body);
+  let catalog=null,focus=null,generation=0,loading=false;
+
+  const editionKey=ref=>JSON.stringify([ref.sourceId,ref.version]);
+  const pinned=(paper,source)=>paper.evidence?.some(ref=>ref.sourceId===source.sourceId && ref.version===source.version);
+  function overview(documents,sources){
+    const overview=el('div');overview.className='ac-knowledge-map';
+    const byEdition=new Map(sources.map(source=>[editionKey(source),source]));
+    const linkedSources=new Map(),linkedPapers=[],connections=[];
+    for(const paper of documents){
+      const assigned=new Set((paper.evidence??[]).map(editionKey).filter(key=>byEdition.has(key)));
+      if(!assigned.size)continue;
+      const paperIndex=linkedPapers.push(paper)-1;
+      for(const key of assigned){
+        if(!linkedSources.has(key))linkedSources.set(key,[]);
+        linkedSources.get(key).push(paperIndex);
+        connections.push({paper,key});
+      }
+    }
+    const makeNode=(record,source,labels)=>{
+      const ref=source?{kind:'source',id:record.sourceId,version:record.version}:{kind:'paper',id:record.id};
+      const node=button(record.title,()=>select(ref));
+      node.className='ac-map-node '+(source?'ac-map-source':'ac-map-paper');
+      node.dataset.kind=ref.kind;node.dataset.id=ref.id;
+      if(source)node.dataset.version=ref.version;
+      const description=labels.length?'Linked to '+labels.join(', '):'No linked '+(source?'manuscripts':'sources');
+      node.title=record.title+' — '+description+(source?' · '+record.version:'');
+      node.setAttribute('aria-description',description);
+      return node;
+    };
+    const header=el('div');header.className='ac-map-heading';
+    header.append(el('small','Manuscripts'),el('small','Source editions'));overview.append(header);
+    if(connections.length){
+      // Center sparse columns and order source editions by the positions of
+      // their actual manuscripts so shared references converge on one node.
+      const average=indices=>indices.reduce((total,i)=>total+i,0)/indices.length;
+      const editions=[...linkedSources.keys()].sort((a,b)=>average(linkedSources.get(a))-average(linkedSources.get(b)));
+      const network=el('div');network.className='ac-map-network';
+      network.setAttribute('role','group');network.setAttribute('aria-label','Manuscripts and their assigned source editions');
+      const rows=Math.max(linkedPapers.length,editions.length);
+      network.style.height=(rows*64)+'px';
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.setAttribute('class','ac-map-links');svg.setAttribute('viewBox','0 0 100 '+rows*64);
+      svg.setAttribute('preserveAspectRatio','none');svg.setAttribute('aria-hidden','true');
+      network.append(svg);
+      const positions=new Map();
+      function place(record,index,length,source,labels){
+        const center=(index+0.5)/length;
+        const node=makeNode(record,source,labels);node.style.top=(center*100)+'%';
+        network.append(node);positions.set(record,{y:center*rows*64,node});
+      }
+      for(const [i,paper] of linkedPapers.entries())
+        place(paper,i,linkedPapers.length,false,connections.filter(link=>link.paper===paper).map(link=>byEdition.get(link.key).title));
+      for(const [i,key] of editions.entries())
+        place(byEdition.get(key),i,editions.length,true,linkedSources.get(key).map(n=>linkedPapers[n].title));
+
+      const neighbors=new Map();
+      for(const {paper,key} of connections){
+        const from=positions.get(paper),to=positions.get(byEdition.get(key));
+        const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+        path.setAttribute('d','M 0 '+from.y+' C 48 '+from.y+' 52 '+to.y+' 100 '+to.y);
+        path.setAttribute('vector-effect','non-scaling-stroke');
+        path.dataset.paperId=paper.id;path.dataset.sourceId=byEdition.get(key).sourceId;
+        path.dataset.version=byEdition.get(key).version;svg.append(path);
+        for(const [node,other] of [[from.node,to.node],[to.node,from.node]]){
+          if(!neighbors.has(node))neighbors.set(node,[]);
+          neighbors.get(node).push({path,other});
+        }
+      }
+      const emphasize=node=>{
+        for(const path of svg.children)path.classList.remove('ac-map-related');
+        for(const button of neighbors.keys())button.classList.remove('ac-map-related');
+        network.classList.toggle('ac-map-tracing',!!node);
+        if(node){
+          node.classList.add('ac-map-related');
+          for(const {path,other} of neighbors.get(node)){path.classList.add('ac-map-related');other.classList.add('ac-map-related');}
+        }
+      };
+      for(const node of neighbors.keys()){
+        node.onfocus=()=>emphasize(node);node.onblur=()=>emphasize(null);
+        node.onmouseenter=()=>emphasize(node);node.onmouseleave=()=>emphasize(neighbors.has(document.activeElement)?document.activeElement:null);
+      }
+      overview.append(network);
+    }
+    const isolatedPapers=documents.filter(paper=>!linkedPapers.includes(paper));
+    const isolatedSources=sources.filter(source=>!linkedSources.has(editionKey(source)));
+    if(isolatedPapers.length||isolatedSources.length){
+      const area=el('section');area.className='ac-map-isolated';
+      area.setAttribute('aria-label','Unlinked records');area.append(el('small','Unlinked records'));
+      const columns=el('div');columns.className='ac-map-columns';
+      for(const [source,records] of [[false,isolatedPapers],[true,isolatedSources]]){
+        const column=el('div');
+        for(const record of records)column.append(makeNode(record,source,[]));
+        columns.append(column);
+      }
+      area.append(columns);overview.append(area);
+    }
+    return overview;
+  }
+
+  function select(item){focus=item;draw();body.querySelector('h4')?.focus();}
+  function draw(){
+    const documents=catalog.documents,sources=catalog.sources;
+    const record=focus?.kind==='paper'?documents.find(d=>d.id===focus.id):sources.find(s=>s.sourceId===focus?.id && s.version===focus?.version);
+    if(!record)focus=null;
+    const fragment=document.createDocumentFragment(),title=el('h4',record?.title||'Project library');
+    title.tabIndex=-1;
+    if(focus)fragment.append(button('← Project library',()=>select(null)));
+    fragment.append(title);
+    const children=(label,items)=>{
+      if(!items.length)return;
+      const branch=el('section'),list=el('ul');branch.className='ac-graph-branch';
+      branch.append(el('small',label+' · '+items.length),list);
+      for(const row of items){
+        const li=el('li');
+        li.append(button(row.title,()=>select(row.sourceId?{kind:'source',id:row.sourceId,version:row.version}:{kind:'paper',id:row.id})));
+        list.append(li);
+      }
+      fragment.append(branch);
+    };
+    if(!focus){
+      if(documents.length||sources.length)fragment.append(overview(documents,sources));
+      if(!documents.length&&!sources.length)fragment.append(el('p','Papers and sources saved in this project will appear here.'));
+    }else if(focus.kind==='paper'){
+      const linked=sources.filter(source=>pinned(record,source));
+      children('Assigned source editions',linked);
+      if(!linked.length)fragment.append(el('p','No sources have been assigned to this manuscript.'));
+      fragment.append(button('Open manuscript',async()=>{try{await openPaper(record.id);}catch(e){body.append(el('p',e.message));}}));
+    }else{
+      const entry=catalog.library?.find(s=>s.sourceId===record.sourceId&&s.version===record.version);
+      fragment.append(el('p',entry?.coverage||record.level?.replaceAll('_',' ')));
+      if(entry?.retrievedAt)fragment.append(el('small','Retrieved '+entry.retrievedAt));
+      if(entry?.note)fragment.append(el('p',entry.note));
+      const url=entry?.url||(record.doi?'https://doi.org/'+record.doi:'');
+      if(/^https?:\/\//i.test(url)){
+        const link=el('a',entry?.doi||record.doi||url);link.href=url;link.target='_blank';link.rel='noopener noreferrer';fragment.append(link);
+      }
+      if(entry?.originalUri){
+        const a=el('a','Download original');a.href=entry.originalUri;a.download=entry.originalFile;fragment.append(a);
+      }
+      const papers=documents.filter(paper=>pinned(paper,record));children('Manuscripts using this edition',papers);
+      if(!papers.length)fragment.append(el('p','No manuscript is linked to this edition.'));
+    }
+    body.replaceChildren(fragment);
+  }
+  async function refresh(){
+    if(!element.open||loading)return;
+    const g=generation;loading=true;
+    if(!catalog)body.textContent='Loading project records…';
+    try{const data=await load();if(g===generation){catalog=data;draw();}}
+    catch(e){if(g===generation)body.replaceChildren(el('p',e.message),button('Reload project records',refresh));}
+    finally{if(g===generation)loading=false;}
+  }
+  element.ontoggle=()=>{if(element.open)refresh();};
+  return {element,refresh,reset(){generation++;loading=false;catalog=null;focus=null;element.open=false;body.replaceChildren();}};
+}};
+
+</script>
+<script>
+// The host owns transitions. This panel displays its receipts and calls scoped controls.
 window.AthenaResearchFlow={mount(root,options){
   const el=(tag,txt)=>{const e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;return e;};
   const button=(txt,action)=>{const b=el('button',txt);b.type='button';b.onclick=action;return b;};
   let service,snapshot,scope='',selectedRun='',generation=0,timer,signature='',tab='progress',report,version,versionState='',hostRun='',requesting=false;
-  let revisionRequest='',revisionError='';
+  let revisionRequest='',revisionError='',stopping='',stopError='';
   const listeners=new AbortController();
   const body=root.querySelector('[data-flow-body]'),notice=root.querySelector('[data-flow-notice]');
   const call=(method,args={})=>service(method,{projectId:snapshot.projectId,sessionId:snapshot.sessionId,...args});
+  const graph=window.AthenaProjectGraph.create({load:()=>call('listPapers'),openPaper:id=>options.editor(id)});
   const draftBox=el('section'),draftLabel=el('strong'),draftText=el('pre'),draftNode=document.createTextNode('');
   draftBox.className='ac-live-manuscript';draftBox.setAttribute('aria-label','Live manuscript');draftBox.hidden=true;
   draftLabel.setAttribute('role','status');draftText.tabIndex=0;draftText.setAttribute('aria-label','Current manuscript text');
@@ -6973,7 +7196,7 @@ window.AthenaResearchFlow={mount(root,options){
   let draftOwner='',lastStream=null;
   function displayDraft(draft){
     if(!draft){draftBox.hidden=true;draftNode.data='';draftOwner='';return;}
-    draftBox.hidden=false;
+    draftBox.hidden=tab!=='preview';
     const label=draft.active?(draft.role==='editor'?'Editing manuscript':'Writing manuscript'):'Saved working draft';
     if(draftLabel.textContent!==label)draftLabel.textContent=label;
     const same=draftOwner===draft.attemptId,follow=!same||draftText.scrollHeight-draftText.scrollTop-draftText.clientHeight<24;
@@ -6984,8 +7207,46 @@ window.AthenaResearchFlow={mount(root,options){
   }
   function viewSignature(){
     const {liveDraft,...stable}=report||{};
-    const data=tab==='preview'&&report?[report.runId,report.history,report.sections,report.sources,report.version,report.revisionRecovery,report.checkpoint,!!liveDraft]:stable;
-    return JSON.stringify([data,version?.version,version?.compilation,version?.review,hostRun,revisionRequest,revisionError,tab]);
+    const data=tab==='preview'&&report?[report.runId,report.history,report.sections,report.sources,report.version,report.revisionRecovery,report.checkpoint,report.autonomy,!!liveDraft]:stable;
+    const recorded=!report && [snapshot?.tasks?.map(t=>[t.id,t.status,t.title]),snapshot?.artifacts?.map(a=>[a.id,a.title,a.version])];
+    return JSON.stringify([data,recorded,version?.version,version?.compilation,version?.review,hostRun,revisionRequest,revisionError,stopping,stopError,tab]);
+  }
+  const recoveryLabels={
+    waiting:'Waiting to resume research',
+    recovering:'Continuing research from saved work',
+    blocked:'Research needs attention',
+    stopped:'Research stopped'
+  };
+  const hostContinuing=r=>['active','waiting','recovering'].includes(r.autonomy?.state);
+  function appendRecovery(group,r){
+    const a=r.autonomy;
+    if(!a)return;
+    const label=recoveryLabels[a.state];
+    if(label){
+      const info=el('section'),heading=el('strong',label);
+      heading.setAttribute('role','status');info.append(heading);
+      if(a.reason)info.append(el('p',a.reason));
+      if(a.attempts>0 && Number.isInteger(a.limit))info.append(el('small',a.attempts+' of '+a.limit+' recovery attempts used'));
+      if(a.state==='waiting' && a.nextAttemptAt){
+        const date=new Date(a.nextAttemptAt);
+        if(Number.isFinite(date.valueOf())){
+          const when=el('time',date.toLocaleTimeString());when.dateTime=date.toISOString();
+          const line=el('p','Next check at ');line.append(when);info.append(line);
+        }
+      }
+      group.append(info);
+    }
+    if(a.canStop){
+      const g=generation,runId=r.runId,stop=button(stopping===runId?'Stopping research…':'Stop research',async()=>{
+        if(stopping || g!==generation)return;
+        stopping=runId;stopError='';render();
+        try{await call('stopResearch',{runId});}
+        catch(e){if(g===generation)stopError=e.message;}
+        finally{if(g===generation){stopping='';render();await update();}}
+      });
+      stop.disabled=stopping===runId;group.append(stop);
+    }
+    if(stopError){const error=el('p',stopError);error.setAttribute('role','alert');group.append(error);}
   }
   function revisionControls(r){
     if(!version || version.version!==r.version || version.currentVersion!==r.version || version.assessment?.verdict!=='changes_required')return null;
@@ -6993,6 +7254,7 @@ window.AthenaResearchFlow={mount(root,options){
     group.append(el('strong','Independent review requested changes'));
     for(const finding of version.assessment.findings||[])findings.append(el('li',finding));
     if(findings.childElementCount)group.append(findings);
+    if(hostContinuing(r))return group;
     const recovery=r.revisionRecovery;
     if(recovery==='restart')group.append(el('p','Another request followed the interrupted revision. Start a new revision from this reviewed edition.'));
     const revise=button(recovery==='resume'?'Resume revision':recovery==='restart'?'Restart revision':'Revise from review',async()=>{
@@ -7031,6 +7293,24 @@ window.AthenaResearchFlow={mount(root,options){
     return group;
   }
   const expanded=new Map();
+  function ordinaryConversation(frag){
+    const run=snapshot?.run;
+    if(tab==='progress'){
+      const tasks=snapshot?.tasks?.filter(t=>t.runId===run?.id)||[];
+      if(tasks.length){
+        const list=el('ol');list.className='ac-flow-stages';
+        for(const task of tasks){
+          const item=el('li');
+          item.append(button(task.title+' · '+task.status,()=>options.open('workflow',{taskId:task.id})));list.append(item);
+        }
+        frag.append(list,button('Workflow graph',()=>options.open('workflow',{runId:run.id})));
+      }else frag.append(el('p','Send a message to begin. Research stages and recorded tasks appear here.'));
+    }else if(tab==='results'){
+      const artifacts=snapshot?.artifacts||[];
+      for(const a of artifacts)frag.append(button(a.title||a.name||'Result file',()=>options.open('artifacts',{artifactId:a.id,version:a.version})));
+      if(!artifacts.length)frag.append(el('p','No experiment outputs have been recorded yet.'));
+    }else frag.append(el('p','This conversation has no linked manuscript.'));
+  }
   function render(){
     signature=viewSignature();
     const disclosureKey=d=>[body.dataset.flowRun,body.dataset.flowView,d.dataset.disclosure||d.querySelector('summary')?.firstChild?.textContent].join(':');
@@ -7038,12 +7318,16 @@ window.AthenaResearchFlow={mount(root,options){
     body.dataset.flowRun=report?.runId||'';body.dataset.flowView=tab;
     const frag=document.createDocumentFragment();
     const r=report;
-    if(!r){if(snapshot?.run&&scope){frag.append(el('p','Loading recorded research stages…'));body.replaceChildren(frag);return;}frag.append(el('p','Send the topic, research question and LaTeX template in chat. Attach any research inputs.'));body.replaceChildren(frag);return;}
+    if(tab==='preview')frag.append(graph.element);
+    if(!r){
+      ordinaryConversation(frag);body.replaceChildren(frag);return;
+    }
     if(r.history.length>1){
       const history=el('select');history.setAttribute('aria-label','Research request');
       for(const entry of r.history){const opt=el('option',entry.title);opt.value=entry.runId;history.append(opt);}
-      history.value=r.runId;history.onchange=()=>{displayDraft(null);selectedRun=history.value;generation++;revisionRequest='';revisionError='';signature='';update();};frag.append(history);
+      history.value=r.runId;history.onchange=()=>{displayDraft(null);selectedRun=history.value;generation++;revisionRequest='';revisionError='';stopping='';stopError='';signature='';update();};frag.append(history);
     }
+    appendRecovery(frag,r);
     if(tab==='progress'){
       const list=el('ol');list.className='ac-flow-stages';
       for(const stage of r.stages){
@@ -7096,8 +7380,23 @@ window.AthenaResearchFlow={mount(root,options){
         li.append(details);list.append(li);
       }
       frag.append(list,button('Workflow graph',()=>options.open('workflow',{taskId:r.stages[0].taskId})));
-      if(r.canResume)frag.append(button('Resume from saved checkpoint',()=>recover('resumeResearch',{runId:r.runId,expectedAttemptId:r.checkpoint})));
-      if(r.error)frag.append(el('p',r.error));
+      if(r.canResume && !hostContinuing(r)){
+        const ids=r.autonomy?.uncertainProcessIds;
+        for(const [index,id] of (ids||[]).entries()){
+          const label=ids.length===1?'Inspect tool attempt':'Inspect tool attempt '+(index+1);
+          frag.append(button(label,()=>options.open('execution',{processId:id})));
+        }
+        const label=ids?.length?'I checked the remote outcome · resume':'Resume from saved checkpoint';
+        frag.append(button(label,()=>recover('resumeResearch',{runId:r.runId,expectedAttemptId:r.checkpoint,...(ids?.length?{confirmedProcessIds:ids}:{})})));
+      }
+      if(r.error && r.error!==r.autonomy?.reason)frag.append(el('p',r.error));
+      const tools=el('details');tools.append(el('summary','Connected experiment and browsing tools'));
+      tools.append(el('p',r.connections.length?r.connections.map(s=>s.name+' · '+s.tools.join(', ')).join('\n'):'No external MCP connection. Browser Use page research and Computer Use GUI experiments require an enabled, verified server.'));
+      for(const kind of ['browser','computer'])if(!r.connections.some(c=>c.capability===kind))tools.append(el('p',kind==='browser'?'Browser Use · no designated page-reading connection':'Computer Use · no designated GUI connection'));
+      for(const c of r.connections)for(const job of c.calls)tools.append(el('p',c.name+' / '+job.tool+' · '+job.status));
+      frag.append(tools);
+    }else if(tab==='results'){
+      if(!r.artifacts.length)frag.append(el('p','No experiment outputs have been recorded yet.'));
       for(const art of r.artifacts){
         frag.append(button(art.name,()=>options.open('artifacts',{artifactId:art.id})));
         const measured=r.tables?.find(t=>t.artifactId===art.id&&t.version===art.version);
@@ -7124,11 +7423,6 @@ window.AthenaResearchFlow={mount(root,options){
           }
         }
       }
-      const tools=el('details');tools.append(el('summary','Connected experiment and browsing tools'));
-      tools.append(el('p',r.connections.length?r.connections.map(s=>s.name+' · '+s.tools.join(', ')).join('\n'):'No external MCP connection. Browser Use page research and Computer Use GUI experiments require an enabled, verified server.'));
-      for(const kind of ['browser','computer'])if(!r.connections.some(c=>c.capability===kind))tools.append(el('p',kind==='browser'?'Browser Use · no designated page-reading connection':'Computer Use · no designated GUI connection'));
-      for(const c of r.connections)for(const job of c.calls)tools.append(el('p',c.name+' / '+job.tool+' · '+job.status));
-      frag.append(tools);
     }else{
       if(version){
         frag.append(el('h3',version.title),el('p','Revision '+version.version.slice(0,8)+' · '+version.review.status));
@@ -7144,7 +7438,8 @@ window.AthenaResearchFlow={mount(root,options){
           for(const [n,page] of (c.pages||[]).entries()){const img=el('img');img.src=page.uri;img.alt='Compiled PDF page '+(n+1);img.className='ac-flow-page';frag.append(img);}
           if(c.previewError)frag.append(el('p',c.previewError));
         }else if(version.review.status==='approved'){
-          frag.append(el('p',c?.error||'Waiting for LaTeX compilation.'),button('Typeset reviewed revision',()=>recover('compilePaper',{documentId:r.documentId,version:version.version})));
+          frag.append(el('p',c?.error||'Waiting for LaTeX compilation.'));
+          if(!hostContinuing(r))frag.append(button('Typeset reviewed revision',()=>recover('compilePaper',{documentId:r.documentId,version:version.version})));
         }else{
           const controls=revisionControls(r);if(controls)frag.append(controls);
         }
@@ -7190,21 +7485,28 @@ window.AthenaResearchFlow={mount(root,options){
         version=saved;versionState=revision;refresh();
       }
       const stage=r?.stages.find(s=>s.status==='Running')||r?.stages.filter(s=>s.status==='Succeeded').at(-1);
-      options.stage(stage?stage.title+' · '+stage.status:'');
+      options.stage(recoveryLabels[r?.autonomy?.state] || (stage?stage.title+' · '+stage.status:''));
       notice.textContent='';
     }catch(e){if(g===generation)notice.textContent=e.message;}
     finally{requesting=false;if(scope&&service)timer=setTimeout(update,g===generation?800:0);}
   }
-  root.addEventListener('click',e=>{const b=e.target.closest('[data-flow-tab]');if(!b)return;tab=b.dataset.flowTab;
-    root.querySelectorAll('[data-flow-tab]').forEach(btn=>btn.setAttribute('aria-pressed',String(btn===b)));render();},{signal:listeners.signal});
-  return {receiveDraft(event){
+  function select(value){
+    if(!['progress','results','preview'].includes(value))return;
+    const changed=tab!==value;
+    tab=value;
+    (options.nav||root).querySelectorAll('[data-flow-tab]').forEach(btn=>btn.setAttribute('aria-pressed',String(btn.dataset.flowTab===tab)));
+    draftBox.hidden=tab!=='preview'||!draftOwner;
+    if(changed){render();if(tab==='preview')graph.refresh();}
+  }
+  if(!options.nav)root.addEventListener('click',e=>{const b=e.target.closest('[data-flow-tab]');if(b)select(b.dataset.flowTab);},{signal:listeners.signal});
+  return {select,receiveDraft(event){
     if(event.sessionId!==scope || (selectedRun||report?.runId)!==event.runId || !event.draft?.active)return;
     lastStream={...event,received:performance.now()};displayDraft(event.draft);
-  },attach(fn){service=fn;if(scope)update();},scope(s){snapshot=s;const next=s.projects?.find(p=>p.id===s.projectId)?.researchWorkflow&&s.sessionId||'';
+  },attach(fn){service=fn;if(scope)update();},scope(s){snapshot=s;const next=s.projectId && s.sessionId && (s.mode==='runtime'||s.projects?.find(p=>p.id===s.projectId)?.researchWorkflow)?s.sessionId:'';
     const run=(s.run?.id||'')+' '+(s.run?.status||'');
-    if(scope===next){if(scope&&hostRun!==run){hostRun=run;if(!report)render();if(!requesting)update();}return;}
-    hostRun=run;scope=next;selectedRun='';generation++;revisionRequest='';revisionError='';lastStream=null;displayDraft(null);report=null;version=null;signature='';versionState='';root.hidden=!scope;clearTimeout(timer);notice.textContent='';options.stage('');render();if(scope)update();},
-    destroy(){listeners.abort();generation++;scope='';clearTimeout(timer);}};
+    if(scope===next){if(scope&&hostRun!==run){hostRun=run;if(!report)render();if(!requesting)update();}else if(scope && !report && signature!==viewSignature())render();return;}
+    hostRun=run;scope=next;graph.reset();expanded.clear();selectedRun='';generation++;revisionRequest='';revisionError='';stopping='';stopError='';lastStream=null;displayDraft(null);report=null;version=null;signature='';versionState='';root.hidden=!scope;clearTimeout(timer);notice.textContent='';options.stage('');render();if(scope)update();},
+    destroy(){listeners.abort();generation++;scope='';graph.reset();clearTimeout(timer);}};
 }};
 
 </script>
@@ -11300,7 +11602,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       article.dataset.streamKey = entry.key;
       if (entry.kind === 'handoff') {
         article.className = 'ac-stream-handoff';
-        const label = document.createElement('summary'); label.className = 'cursor-interaction'; label.textContent = 'Manuscript instructions';
+        const label = document.createElement('summary'); label.className = 'cursor-interaction'; label.textContent = entry.handoff;
         const body = document.createElement('p'); body.className = 'ac-stream-text';
         article.append(label, body);
       } else if (entry.kind !== 'tool') {
@@ -11311,6 +11613,11 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       }
       nodes.set(entry.key, article);
       return article;
+    }
+    function handoffLabel(owner,message){
+      if(!owner)return;
+      if(message.researchContinuation===true)return 'Research resumed';
+      if(message.manuscriptHandoff===true)return 'Manuscript instructions';
     }
     function currentTools() {
       const workspace = options.getWorkspace?.();
@@ -11461,7 +11768,8 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         }
         if (!['user', 'assistant'].includes(message.role)) continue;
         if (message.role === 'user') {
-          entries.push({ key: 'history:' + index, kind: owner && message.manuscriptHandoff === true ? 'handoff' : 'message', role: 'user', text: text(message.content), attachments: attachmentNames(message.attachments), athena: owner, at });
+          const handoff=handoffLabel(owner,message);
+          entries.push({ key: 'history:' + index, kind: handoff ? 'handoff' : 'message', handoff, role: 'user', text: text(message.content), attachments: attachmentNames(message.attachments), athena: owner, at });
           continue;
         }
         const content = typeof message.content === 'string' ? [{ type: 'text', text: message.content }] : message.content || [];
@@ -11496,9 +11804,9 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         if (pendingUser && !pendingUser.athena) pendingUser.athena = owner;
       }
       if (event.type === 'message_start' && event.message?.role === 'user') {
-        const handoff = owner && event.message.manuscriptHandoff === true;
+        const handoff = handoffLabel(owner,event.message);
         if (!pendingUser || pendingUser.observed || handoff) {
-          pendingUser = { key: 'user:' + generation + ':' + (++userCounter), kind: handoff ? 'handoff' : 'message', role: 'user', text: '', athena: owner, at: null, order: lastObservedOrder + 0.5 };
+          pendingUser = { key: 'user:' + generation + ':' + (++userCounter), kind: handoff ? 'handoff' : 'message', handoff, role: 'user', text: '', athena: owner, at: null, order: lastObservedOrder + 0.5 };
           entries.push(pendingUser); liveKeys.add(pendingUser.key);
         }
         pendingUser.observed = true;
@@ -13782,6 +14090,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
  let piHistoryAfterSettle=-1;
  let piRuntime=null,piWorkbench=null,piRuntimeSubscription=null,piEventSubscription=null,piManualView=null,piSessionIdentity='',piCommandSignature='',piWidgetSignature='',piHistorySignature='',piSubmitting=false,piDraftOffer='',piDraftSeen='',piTurnEpoch=0,piSubmittedContext=null;
  const piManualTools=new Map(), sessionDrafts=new Map();
+ let piTaskManagerSessionId=null;
  const failedDrafts=[];
  let paperPanel, researchFlow, shownResearchSession=null,currentResearchStage='';
  let projectSignature='', activeProjectId='project-rc', activeDocumentId='research-note', requestedDocumentVersion=null, lifecyclePending=false, nativeSessionTransition=null;
@@ -13870,6 +14179,13 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   return focusWillHide;
  }
  function openPanel(tab=state.panelTab,artifact=null,from=null){
+  const researchTabs={workflow:'progress',results:'results',manuscript:'preview'};
+  if(!artifact && !q('#ac-flow-nav').hidden && researchTabs[tab]){
+   showPanel(from);const moveFocus=selectSideView('research','Research');
+   q('#ac-view-manuscript').dataset.editorOpen='false';panelTab('manuscript');researchFlow?.select(researchTabs[tab]);
+   layout?.refresh();overlay();if(moveFocus || root.dataset.panelLayout==='overlay')q('#ac-flow-nav [aria-pressed="true"]')?.focus({preventScroll:true});
+   return;
+  }
   if(tab==='results'&&workspaceStore?.getState().mode==='runtime'){openWorkspace('artifacts',artifact?{artifactId:artifact}:null,from);return;}
   if(tab==='workflow'){openWorkspace('workflow',null,from);return}
   showPanel(from);const moveFocus=selectSideView('research','Research');
@@ -13885,7 +14201,11 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   layout?.refresh();overlay();surfaces?.open(id,!q('#ac-research-panel').inert);announce('Side view opened.');
  }
  function openWorkspace(view='workflow',selection=null,from=null){
-  if(view==='manuscript'){openDocument(selection||{});openPanel('manuscript',null,from);return;}
+  if(view==='manuscript'){
+   openPanel('manuscript',null,from);
+   if(selection?.documentId)q('#ac-view-manuscript').dataset.editorOpen='true';
+   openDocument(selection||{});return;
+  }
   if(view==='execution'){
    composer.closeMenu?.();closePanel(false);overlay();
    const toolId=selection?.toolId;
@@ -13989,6 +14309,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   toast('PDF export confirmed for '+result.documentId+' · v'+result.version+'.');
  }
  function renderWorkspace(snapshot){
+  if(failedDrafts.length)renderUnsent(snapshot.sessionId);
   const previousSession=root.dataset.sessionId;
   if(snapshot.mode==='runtime'&&previousSession&&snapshot.sessionId!==previousSession&&(snapshot.sessionId||snapshot.taskManagerConnected)&&!lifecyclePending){
    sessionDrafts.set(previousSession,composer.captureDraft());preservePendingSubmission('The workspace switched conversations.');resetPiActivity();
@@ -13997,10 +14318,11 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   }
   const live=snapshot.mode==='runtime';root.dataset.workspaceMode=snapshot.mode;root.dataset.sessionBound=String(snapshot.sessionBound!==false);
   paperPanel?.scope(snapshot);researchFlow?.scope(snapshot);
-  const guided=snapshot.projects?.some(p=>p.id===snapshot.projectId&&p.researchWorkflow)&&!!snapshot.sessionId;
+  const guided=live && !!snapshot.projectId && !!snapshot.sessionId;
+  q('#ac-flow-nav').hidden=!guided;
   q('#ac-view-manuscript').dataset.guided=String(!!guided);
   if(guided&&shownResearchSession!==snapshot.sessionId){
-    shownResearchSession=snapshot.sessionId;q('#ac-view-manuscript').dataset.editorOpen='false';openPanel('manuscript');
+    shownResearchSession=snapshot.sessionId;openPanel('workflow');
   }
   if(live){q('#ac-doc-evidence').hidden=true;q('[data-action="export-manuscript"]').hidden=true;}
   surfaces?.setRuntimeMode?.(live);
@@ -14096,7 +14418,10 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   }finally{lifecyclePending=false;}
  }
  async function openResearchSession(sessionId){
-  if(lifecyclePending||piSubmitting||nativeSessionTransition||state.busy){toast('Wait for the current operation to finish.');return;}
+  const workspace=workspaceStore.getState(),pi=piRuntime.getState();
+  if(sessionId===workspace.sessionId&&workspace.sessionBound!==false&&pi.connected)return;
+  const canBrowseWhileRunning=workspace.capabilities?.backgroundSessions&&workspace.sessionId&&piTaskManagerSessionId===workspace.sessionId;
+  if(lifecyclePending||piSubmitting||piSubmittedContext||nativeSessionTransition||(!canBrowseWhileRunning&&(state.busy||pi.session.isStreaming))){toast('Wait for the current operation to finish.');return;}
   lifecyclePending=true;rememberDraft();
   try{activateSession(await workspaceStore.openSession(sessionId));}catch(error){toast(String(error.message||error));}finally{lifecyclePending=false;}
  }
@@ -14168,8 +14493,13 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
  }
  function sameDraftContext(files,mentions){return files.length===composer.getAttachments().length&&files.every((file,i)=>file===composer.getAttachments()[i])&&JSON.stringify(mentions.map(m=>m.id))===JSON.stringify(composer.getSelections().map(m=>m.id))}
  function keepUnsent(draft,reason){
-  failedDrafts.push({value:draft.value,attachments:[...draft.attachments],mentions:[...draft.mentions],sessionId:draft.sessionId||null,reason});
-  q('#ac-unsent-draft').hidden=false;q('#ac-unsent-draft span').textContent=failedDrafts.length+' unsent message'+(failedDrafts.length===1?' is':'s are')+' kept with attachments.';
+  failedDrafts.push({value:draft.value,attachments:[...draft.attachments],mentions:[...draft.mentions],sessionId:draft.sessionId||null,
+   scoped:!!draft.sessionId&&workspaceStore.getState().capabilities?.backgroundSessions,reason});
+  renderUnsent(workspaceStore.getState().sessionId);
+ }
+ function renderUnsent(sessionId){
+  const available=failedDrafts.filter(draft=>!draft.scoped||draft.sessionId===sessionId);
+  q('#ac-unsent-draft').hidden=!available.length;q('#ac-unsent-draft span').textContent=available.length+' unsent message'+(available.length===1?' is':'s are')+' kept with attachments.';
  }
  function preservePendingSubmission(reason){if(!piSubmittedContext)return;const pending=piSubmittedContext;piSubmittedContext=null;keepUnsent(pending,reason);}
  function conversationBinding(){const workspace=workspaceStore?.getState();return {projectId:workspace?.projectId||null,sessionId:workspace?.sessionId||null,piSessionId:piRuntime.getState().session.sessionId||piRuntime.getState().session.id||null};}
@@ -14368,6 +14698,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   piActivity.receive(event);
  }
  function detachPiSession(){
+  piTaskManagerSessionId=null;
   preservePendingSubmission('The model disconnected before accepting this message.');nativeSessionTransition=null;piSessionEpoch+=1;piTurnEpoch++;
   piSessionUnsubscribe?.();piSessionUnsubscribe=null;piSession=null;
   if(piEngaged&&!piPreviewActive){reply.stop();state.busy=false;composer.setBusy(false)}
@@ -14380,6 +14711,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   piView?.clear?.();q('#ac-pi-transcript').hidden=true;piHistorySignature='';q('#ac-live-user').hidden=true;q('#ac-live-reply').hidden=true;piManualTools.clear();piManualView.reset();
   const epoch=++piSessionEpoch;
   const binding=piRuntime.attach(session,options);piSession=binding.session;piSessionUnsubscribe=binding.detach;
+  piTaskManagerSessionId=session.taskManagerSessionId||null;
   const current=piSession;
   return ()=>piSession===current&&piSessionEpoch===epoch?detachPiSession():false;
  }
@@ -14436,8 +14768,8 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
    toast(finished?'Preview: the existing run is complete.':'Preview: the existing run was checked. No new calculation was submitted.');
   },800);
  }
- listen(root,'click',e=>{const b=e.target.closest('button');if(!b||!root.contains(b)||b.disabled)return;if(b.dataset.openSession){openResearchSession(b.dataset.openSession);return;}if(b.dataset.open){if(b.hasAttribute('data-search-result'))closeDialog();openPanel(b.dataset.open,b.dataset.artifact||null,b);return}if(b.dataset.panelTab){if(b.dataset.panelTab==='workflow')openWorkspace('workflow',null,b);else panelTab(b.dataset.panelTab);return}if(b.dataset.workspaceView){openWorkspace(b.dataset.workspaceView,null,b);return}if(b.dataset.workspaceArtifact){openWorkspace('artifacts',{artifactId:b.dataset.workspaceArtifact},b);return}const action=b.dataset.action;if(!action)return;
-  if(action==='toggle-panel'){if(state.panelOpen)closePanel(false);else{const view=settings?.getState().defaultSideView||'home';view==='research'?openPanel(state.panelTab,null,b):openSurface(view,b)}return}if(action==='surface-home'){openSurface('home',b);return}if(action==='toggle-left'){toggleLeft();return}if(action==='open-file'){openSurface('files',b);surfaces?.openFile?.(b.dataset.file);return}if(action==='close-dialog'){closeDialog();return}if(action==='reconcile'){reconcile();return}
+ listen(root,'click',e=>{const b=e.target.closest('button');if(!b||!root.contains(b)||b.disabled)return;if(b.dataset.flowTab){openPanel(({progress:'workflow',results:'results',preview:'manuscript'})[b.dataset.flowTab],null,b);return;}if(b.dataset.openSession){openResearchSession(b.dataset.openSession);return;}if(b.dataset.open){if(b.hasAttribute('data-search-result'))closeDialog();openPanel(b.dataset.open,b.dataset.artifact||null,b);return}if(b.dataset.panelTab){if(b.dataset.panelTab==='workflow')openWorkspace('workflow',null,b);else panelTab(b.dataset.panelTab);return}if(b.dataset.workspaceView){openWorkspace(b.dataset.workspaceView,null,b);return}if(b.dataset.workspaceArtifact){openWorkspace('artifacts',{artifactId:b.dataset.workspaceArtifact},b);return}const action=b.dataset.action;if(!action)return;
+  if(action==='toggle-panel'){if(state.panelOpen)closePanel(false);else if(!q('#ac-flow-nav').hidden){q('#ac-flow-nav [aria-pressed="true"]').click();}else{const view=settings?.getState().defaultSideView||'home';view==='research'?openPanel(state.panelTab,null,b):openSurface(view,b)}return}if(action==='surface-home'){openSurface('home',b);return}if(action==='toggle-left'){toggleLeft();return}if(action==='open-file'){openSurface('files',b);surfaces?.openFile?.(b.dataset.file);return}if(action==='close-dialog'){closeDialog();return}if(action==='reconcile'){reconcile();return}
   if(action==='open-claim'){openPanel('results','response',b);return}
   if(action==='edit-manuscript'){
    const doc=records.getDocument(activeDocumentId);if(!doc||doc.selectedVersion!==doc.currentVersion){toast('Select the latest document version to edit.');return;}
@@ -14463,9 +14795,10 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   if(action==='new-research'){requestResearch();return;}
   if(action==='current-draft'){closeDialog();composer.focus();return;}
   if(action==='restore-unsent'){
-   const failed=failedDrafts.shift();if(!failed)return;const current=composer.captureDraft();
+   const sessionId=workspaceStore.getState().sessionId,index=failedDrafts.findIndex(d=>!d.scoped||d.sessionId===sessionId);
+   if(index<0)return;const [failed]=failedDrafts.splice(index,1),current=composer.captureDraft();
    composer.restoreDraft({value:failed.value+(current.value?'\n\n'+current.value:''),attachments:[...failed.attachments,...current.attachments],mentions:[...failed.mentions,...current.mentions]});
-   q('#ac-unsent-draft').hidden=!failedDrafts.length;q('#ac-unsent-draft span').textContent=failedDrafts.length+' unsent messages remain.';return;
+   renderUnsent(sessionId);return;
   }
   if(action==='notes'){openPanel('manuscript',null,b);return}if(action==='copy-response'){const text=q('.ac-response').innerText;if(navigator.clipboard?.writeText)navigator.clipboard.writeText(text).then(()=>toast('Response copied.')).catch(()=>toast('Clipboard access is unavailable in this environment.'));else toast('Clipboard access is unavailable in this environment.');return}
   if(action==='current-thread'){return}
@@ -14528,7 +14861,7 @@ const dialogOpen=!q('#ac-dialog-backdrop').hidden;const rightOverlay=state.panel
  chatModelPicker=window.AthenaChatModelPicker.mount(q('#ac-model-picker-slot'),{runtime:piRuntime,preferences:modelConfig,icons,announce,isBusy:()=>state.busy||piSubmitting||lifecyclePending||Boolean(nativeSessionTransition),isSessionBound:()=>workspaceStore.getState().sessionBound!==false,isUnavailable:()=>q('#ac-conversation').inert,beforeOpen(){composer.closeMenu?.();command?.close?.(false)},onOpenSettings(){piSession?openPi('model'):openSettings('models')}});
  workspaceStore.configure?.({parallelLimit:modelConfig.parallelLimit});
  piWorkbench=window.AthenaPiWorkbench.mount(q('#ast-pi-workbench-slot'),{runtime:piRuntime,icons,toast,onDraft:usePiDraft,onSectionChange:section=>settings?.routeRuntime(section),onModalChange(){overlay()}});
- researchFlow=window.AthenaResearchFlow?.mount(q('#ac-research-flow'),{open:openWorkspace,editor:async id=>{q('#ac-view-manuscript').dataset.editorOpen='true';await paperPanel?.select(id);q('#ac-paper-project').scrollIntoView({block:'start'});},stage:text=>{currentResearchStage=text;const e=q('#ac-flow-stage');if(e)e.textContent=text;}});
+ researchFlow=window.AthenaResearchFlow?.mount(q('#ac-research-flow'),{nav:q('#ac-flow-nav'),open:openWorkspace,editor:async id=>{q('#ac-view-manuscript').dataset.editorOpen='true';await paperPanel?.select(id);q('#ac-paper-project').scrollIntoView({block:'start'});},stage:text=>{currentResearchStage=text;const e=q('#ac-flow-stage');if(e)e.textContent=text;}});
  paperPanel=window.AthenaManuscripts?.mount(q('#ac-paper-project'),{open:(documentId,version)=>openDocument({documentId,version}),cancel:id=>workspaceStore.cancel(id)});
  mountDocumentToolbar();
  recordsOff=records.subscribe(renderDocumentRecord);

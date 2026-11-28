@@ -28,7 +28,20 @@ export type ExternalClientOptions = {
 };
 export class ExternalMcpError extends Error {
   readonly code: string;
-  constructor(code: string, message: string) { super(message); this.name = 'ExternalMcpError'; this.code = code; }
+  readonly httpStatus?: number;
+  constructor(code: string, message: string, httpStatus?: number) {
+    super(message); this.name = 'ExternalMcpError'; this.code = code; this.httpStatus = httpStatus;
+  }
+}
+const transientNetworkCodes = new Set(['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ENETUNREACH', 'EHOSTUNREACH',
+  'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT']);
+export function isTransientExternalConnectionError(error: unknown): boolean {
+  if (error instanceof ExternalMcpError) return [408, 429, 500, 502, 503, 504].includes(error.httpStatus ?? 0);
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'TimeoutError') return true;
+  if ('code' in error && typeof error.code === 'string' && transientNetworkCodes.has(error.code)) return true;
+  if (error instanceof AggregateError && error.errors.length) return error.errors.every(isTransientExternalConnectionError);
+  return error.cause instanceof Error && isTransientExternalConnectionError(error.cause);
 }
 const object = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 export function canonicalJson(value: unknown): string {
@@ -230,7 +243,7 @@ class HttpSession {
       }
       this.sessionId = sessionId;
     }
-    if (!response.ok) { await response.body?.cancel(); throw new ExternalMcpError('MCP_HTTP_ERROR', 'MCP endpoint returned HTTP ' + response.status + '.'); }
+    if (!response.ok) { await response.body?.cancel(); throw new ExternalMcpError('MCP_HTTP_ERROR', 'MCP endpoint returned HTTP ' + response.status + '.', response.status); }
     if (id === undefined) {
       await response.body?.cancel();
       if (response.status !== 202) throw new ExternalMcpError('MCP_PROTOCOL_ERROR', 'MCP notification was not accepted.');
@@ -335,10 +348,21 @@ class HttpSession {
     await fetch(this.server.url, { method: 'DELETE', headers: this.headers(), redirect: 'error', signal: AbortSignal.timeout(500) })
       .then(response => response.body?.cancel()).catch(() => {});
   }
+  async checkPinnedDiscovery(verification: ExternalVerification): Promise<void> {
+    const current = await this.discovery();
+    if (current.digest !== verification.digest) throw new ExternalMcpError('MCP_CONFIGURATION_CHANGED', 'MCP identity or tool schema changed. Check the connection again before a new run.');
+  }
 }
 export async function discoverExternalMcp(server: ExternalServerDefinition, options: ExternalClientOptions = {}): Promise<ExternalVerification> {
   const client = new HttpSession(server, options);
   try { return await client.discovery(); } finally { await client.close(); }
+}
+/** Recheck the original grant without ever invoking a remote tool or replacing the pin. */
+export async function probePinnedExternalMcp(server: ExternalServerDefinition, verification: ExternalVerification,
+  options: ExternalClientOptions = {}): Promise<void> {
+  validateExternalVerification(server, verification);
+  const client = new HttpSession(server, options);
+  try { await client.checkPinnedDiscovery(verification); } finally { await client.close(); }
 }
 export async function callExternalMcp(server: ExternalServerDefinition, verification: ExternalVerification, toolName: string,
   args: Readonly<Record<string, unknown>>, options: ExternalClientOptions = {}): Promise<ExternalToolResult> {
@@ -347,8 +371,7 @@ export async function callExternalMcp(server: ExternalServerDefinition, verifica
   if (!expected || !object(args) || !matchesExternalSchema(expected.inputSchema, args)) throw new ExternalMcpError('INVALID_ARGUMENTS', 'Arguments do not match the configured MCP tool.');
   const client = new HttpSession(server, options);
   try {
-    const current = await client.discovery();
-    if (current.digest !== verification.digest) throw new ExternalMcpError('MCP_CONFIGURATION_CHANGED', 'MCP identity or tool schema changed. Check the connection again before a new run.');
+    await client.checkPinnedDiscovery(verification);
     options.onPhase?.('tools/call');
     const result = await client.request('tools/call', { name: toolName, arguments: args });
     if (!object(result) || !Array.isArray(result.content) || result.content.length > 128

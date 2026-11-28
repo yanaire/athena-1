@@ -105,4 +105,20 @@ test('the recorded experiment stays in progress until its workers settle and the
   assert.deepEqual(await report(),['Succeeded',task.id]);
   db.set('experiment.mission:'+scope.runId,{missionId:'mission',status:'exhausted',contract:{direction:'at_most',target:0},trials:[]});
   assert.deepEqual(await report(),['Waiting for input',undefined], 'Adaptive runs retain the mission outcome.');
+
+  const review={missionId:'mission',requestedBy:scope,state:'completed',targets:[],reviewer:{attemptId:'review-1'}};
+  db.putRecord('attempt',{...scope,id:'review-1',status:'succeeded'});
+  db.putRecord('attempt',{...scope,id:'review-2',status:'succeeded'});
+  const verification=async()=>{
+    const response=await manager.paperRequest('researchFlow',scope) as {stages:{title:string;status:string;description:string}[]};
+    return response.stages.find(s=>s.title==='Verify results')!;
+  };
+  const initial={...review,id:'supported',verdict:'supported'};
+  db.set(ledger,{...document,evidence:[],reviews:[initial]});
+  assert.equal((await verification()).status,'Succeeded');
+  const challenge={...review,id:'challenge',verdict:'insufficient_evidence',findings:['The field measurement is missing.'],reviewer:{attemptId:'review-2'}};
+  db.set(ledger,{...document,evidence:[],reviews:[initial,challenge]});
+  const next=await verification();
+  assert.equal(next.status,'Waiting for input');
+  assert.match(next.description,/field measurement is missing/);
 });

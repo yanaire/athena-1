@@ -13,13 +13,17 @@ research infrastructure.
 For new research runs the selected main model writes the study objective, ordered
 steps and acceptance criteria through `plan_research`. It may inspect granted inputs
 and existing project papers while planning. TaskManager requires a saved plan before
-delegating work or starting a remote search. Expand **Research progress → Research
+delegating work or starting a remote search. Expand **Workflow → Research
 plan** to see the steps and criteria sent by the coordinator. A revised plan is
 recorded alongside earlier plans in the research board.
 
 Create a project with the research option selected and choose its local work folder if desired. The host records the resolved directory and Git branch. Attach each input through the composer to grant access. The first conversation opens immediately. Choose the model and reasoning level, attach the data or supported LaTeX template, and send the research question. Changes to the conversation model apply to the next request.
 
-The **Research progress** tab reads the plan, bibliography, tool calls, condition tables, review receipts and compilation from TaskManager. Expand a stage to open the worker and its attempts in Workflow. Select a condition table to inspect the producing program, result version and its granted original inputs. **Manuscript preview** shows saved preliminary sections during the experiment, then the reviewed revision, compiled pages, source links and downloads. The existing editor remains available there.
+The research sidebar has three tabs. **Workflow** shows the plan, assignments, checks and recovery state. **Experiment results** shows measured conditions, versioned outputs and their inputs. **Paper** shows the draft, reviews and compiled pages, with a project graph of saved literature and manuscript evidence. The graph uses stored source editions. Open another existing conversation while the research runs to read or use it, then return to the study to inspect the updated checkpoints.
+
+TaskManager supervises each new research request across process restarts. When a coordinator finishes without a verified handoff, it receives the original brief, outstanding findings and saved receipts to delegate the remaining work. An independent manuscript review can send a draft back to the editor, or return the study to its research coordinator to obtain new evidence. A compiled PDF and an independent approval for the same edition complete the flow. Restoring a missing compiler or a disconnected pinned plugin can unblock work. Connection checks use the existing verified configuration and back off to one check per minute while the host is running.
+
+Each request permits six automatic corrective admissions. Connection probes use no model attempts. Using **Stop research** also stops automatic continuation between attempts. If a remote call was dispatched but its result was lost, check the remote outcome before resuming. The original result and review records remain available. Older studies begin supervised continuation when the user resumes their checkpoint.
 
 The coordinator can search public Crossref using the project's research permission. A verified external MCP with a `browser` or `computer` capability can read pages or operate a GUI using its declared tools. Enable and check that connection in Settings. System-browser navigation has its own history. A citation to a visited page needs the URL and quoted text in the returned tool receipt. The host records the retrieval time and scope. Crossref citations retain the DOI and the metadata or abstract actually received.
 

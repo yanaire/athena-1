@@ -60,6 +60,7 @@ export type HostRpcRequest =
   | { readonly method: 'deleteModelProfile'; readonly args: readonly [id: string, revision: number] }
   | { readonly method: 'setWorkerModelPreference'; readonly args: readonly [WorkerModelPreference] }
   | { readonly method: 'listLibrarySources'; readonly args: readonly [{ readonly projectId:string }] }
+  | { readonly method: 'stopResearch'; readonly args: readonly [{ readonly projectId:string; readonly sessionId:string; readonly runId:string }] }
   | { readonly method: 'searchAndSavePapers'; readonly args: readonly [{ readonly projectId:string; readonly sessionId:string; readonly mode:'query'|'doi'; readonly term:string; readonly requestId:string }] }
   | { readonly method: 'setAppModelProfile'; readonly args: readonly [id: string | null] }
   | { readonly method: 'setProjectModelProfile' | 'setConversationModelProfile'; readonly args: readonly [scopeId: string, profileId: string | null] }

@@ -90,7 +90,7 @@
     };
     const canStage = piCapabilities.includes('stage_files');
     return {
-      mode: 'host', label: 'Athena host connected', capabilities: piCapabilities,
+      mode: 'host', taskManagerSessionId: sessionId, label: 'Athena host connected', capabilities: piCapabilities,
       inputContract,
       supportsFileReferences: canStage,
       request, send: request,

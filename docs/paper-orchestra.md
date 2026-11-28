@@ -4,7 +4,9 @@ Open a project conversation and enable offline analysis in its execution setting
 
 When a research coordinator supplies `librarySources`, each citation includes the saved source ID, edition and its intended use. The host verifies the edition in the current project's library and grants its frozen text to the manuscript workers. Approved citations appear in the compiled references and evidence export.
 
-If the independent reviewer still requests changes after the automatic revision, open **Manuscript preview** and select **Revise from review**. The editor receives the exact previous manuscript and review findings. A fresh reviewer checks the revised edition against its frozen sources. The original research run keeps its model settings and experimental results. Expand **Research activity** in the chat to inspect the recorded work.
+In an autonomous research workflow, a `changes_required` manuscript verdict sends the reviewed edition and findings to an editor. A fresh reviewer checks the corrected edition against its pinned sources. An `insufficient_evidence` verdict sends the findings back to the original research coordinator. The host retains the earlier manuscript and requires a new result with a fresh independent evidence review before admitting the next manuscript. These assignments use the original research settings and the workflow’s remaining recovery budget. For a manually started manuscript, **Revise from review** starts the next editorial assignment.
+
+If the approved text has a table, diagram or figure reference that the renderer cannot typeset, the editor receives the compiler diagnostic and the reviewed manuscript. The corrected edition requires its own review. When the compiler reports a missing LaTeX engine or named package, Athena checks for the dependency and resumes typesetting the approved edition once it is available. Expand **Research activity** in chat to inspect the recorded work.
 
 For an approved PDF made with an older renderer, **Update typesetting** compiles the same reviewed text with the current renderer. The previous PDF remains downloadable during compilation.
 

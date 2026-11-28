@@ -52,3 +52,21 @@
 
 #ac-view-manuscript[data-guided=true][data-editor-open=false]>:not(#ac-research-flow){display:none}
 #ac-live-projects small.ac-project-empty{display:block;overflow-wrap:anywhere}
+
+#athena-codex #ac-flow-nav{display:flex;gap:4px;align-items:stretch;padding:0 12px;border-bottom:1px solid var(--ac-line);flex-shrink:0}
+#athena-codex #ac-flow-nav button{min-height:42px;padding:6px 8px;font-size:12px;line-height:1.35;color:#666958;flex:1;overflow-wrap:anywhere}
+#athena-codex #ac-flow-nav button[aria-pressed=true]{font-weight:650;color:#343c2f;box-shadow:inset 0 -2px #557054}
+#athena-codex #ac-flow-nav:not([hidden])~.aw-side-nav,
+#athena-codex #ac-flow-nav:not([hidden])~#ac-research-slot>.ac-panel-tabs{display:none}
+#athena-codex #ac-research-flow{margin:0;padding:0;border:0}
+#athena-codex .ac-project-graph{border-block:1px solid var(--ac-line);padding:9px 0;margin-bottom:12px}
+#athena-codex .ac-project-graph summary{cursor:pointer;font-weight:600}
+#athena-codex .ac-project-graph>section{margin:12px 0;max-height:50vh;overflow:auto;overflow-wrap:anywhere}
+#athena-codex .ac-project-graph h4{font-weight:600;font-size:14px;line-height:1.4;margin:8px 0}
+#athena-codex .ac-project-graph a{display:block;padding:4px 0}
+#athena-codex .ac-graph-branch{margin:10px 0 10px 5px}
+#athena-codex .ac-graph-branch ul{list-style:none;margin:4px 0 0 3px;border-left:1px solid #afb9aa;padding-left:0}
+#athena-codex .ac-graph-branch li{display:flex;align-items:center;margin:0;padding:3px 0}
+#athena-codex .ac-graph-branch li::before{content:'';flex:0 0 12px;border-bottom:1px solid #afb9aa}
+#athena-codex .ac-graph-branch button{border:1px solid #d8ddd4;border-radius:7px;padding:4px 8px;text-align:left;background:#f7f8f3;overflow-wrap:anywhere}
+#athena-codex .ac-graph-branch button:hover{background:#ecf0e7}

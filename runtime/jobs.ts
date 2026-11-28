@@ -10,7 +10,7 @@ import { lstat, mkdir, open, realpath, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { fileURLToPath } from 'node:url';
-import { callExternalMcp, EXTERNAL_MCP_LIMITS, validateExternalVerification, matchesExternalSchema, extensionDigest } from './external-mcp-client.ts';
+import { callExternalMcp, EXTERNAL_MCP_LIMITS, ExternalMcpError, isTransientExternalConnectionError, validateExternalVerification, matchesExternalSchema, extensionDigest } from './external-mcp-client.ts';
 import type { PinnedExternalServer } from './extensions.ts';
 import { createPrivateDirectory } from './private-storage.ts';
 
@@ -111,6 +111,9 @@ export type JobAttempt = Identity & { readonly grantId?: string; readonly column
     readonly alias?:string; readonly resultKind?:string; readonly displayName?:string; readonly registryVersion?:number };
   readonly toolArguments?: Readonly<Record<string,unknown>>;
   readonly externalMcp?: {readonly serverId:string;readonly pluginId:string;readonly pluginRevision:string;readonly verificationDigest:string;readonly url:string;readonly tool:string;readonly argumentDigest:string};
+  /** Stored before tools/call can leave the host. Older receipts have no dispatch fence. */
+  readonly externalDispatch?: 'pending' | 'dispatching';
+  readonly externalFailure?: 'connection' | 'blocked' | 'tool_error' | 'outcome_unknown';
   readonly artifacts?: readonly AnalysisArtifact[]; readonly containerId?: string; readonly executionId?: string;
   readonly analysis?: { readonly language: SandboxJob['language']; readonly script: string; readonly outputs: readonly string[];
     readonly inputs: readonly {readonly name:string; readonly sha256:string; readonly fileId?:string; readonly versionId?:string}[];
@@ -210,9 +213,12 @@ export class JobRunner {
       if (this.#known.has(key)) continue;
       this.#known.add(key);
       if (prior.status === 'running' || prior.status === 'queued') {
+        const beforeDispatch=!!prior.externalMcp && prior.externalDispatch==='pending';
         const attempt: JobAttempt = Object.freeze({ ...prior, status: 'interrupted', endedAt: Date.now(),
-          exitCode: null, signal: null, cancellation: 'unknown', artifact: undefined, artifacts: undefined,
-          error: 'Host restarted before the process attempt settled. Process termination was not observed; the attempt will not rerun.' });
+          exitCode: null, signal: null, cancellation: beforeDispatch?'confirmed':'unknown', artifact: undefined, artifacts: undefined,
+          ...(prior.externalMcp ? {externalFailure:beforeDispatch?'connection' as const:'outcome_unknown' as const} : {}),
+          error: beforeDispatch?'Host restarted before the external tool was invoked.':
+            'Host restarted before the process attempt settled. Process termination was not observed; the attempt will not rerun.' });
         queueMicrotask(() => this.#emit({ type: 'process_finished', attempt }));
       }
     }
@@ -328,7 +334,7 @@ export class JobRunner {
       version:external.server.verification.serverInfo.version,protocol:external.server.verification.protocolVersion,tool:external.tool,
       alias:'external:'+external.server.id+':'+external.tool,resultKind:'mcp-result',phase:'initialize' as const} : undefined;
     const pending: Pending = { result, resolve, analysis, registration, external, attempt: Object.freeze({ ...job,
-      ...(externalIdentity ? {mcp:externalIdentity} : registration ? { mcp: { ...registration.binding.identity, phase: 'initialize' as const } } : {}),
+      ...(externalIdentity ? {mcp:externalIdentity,externalDispatch:'pending' as const} : registration ? { mcp: { ...registration.binding.identity, phase: 'initialize' as const } } : {}),
       program: external ? 'External MCP' : analysis ? analysis.language : process.execPath, args: job.args ?? Object.freeze([]),
       cwd: null, env: external ? {} : analysis ? analysisEnv : ENV,
       limits: external ? {...this.#limits,artifactBytes:EXTERNAL_MCP_LIMITS.responseBytes+16*1024,timeoutMs:external.server.definition.timeoutMs ?? 10000} : this.#limits, pid: null, status: 'queued', startedAt: null, endedAt: null,
@@ -416,6 +422,7 @@ export class JobRunner {
       this.#observer?.({ type: 'process_finished', attempt });
     } catch {
       attempt = Object.freeze({ ...attempt, status: 'failed', artifact: undefined, artifacts: undefined,
+        ...(attempt.externalMcp ? {externalFailure:'outcome_unknown' as const} : {}),
         error: 'Could not persist process completion. Result artifacts were not published.' });
       pending.attempt = attempt;
       try {
@@ -574,9 +581,16 @@ export class JobRunner {
       this.#emit({type:'process_started',attempt:pending.attempt});
       const result=await callExternalMcp(external.server.definition,external.server.verification,external.tool,external.arguments,{
         token:external.token,signal:ctl.signal,onPhase:phase=>{
-          if (phase==='tools/call') dispatched=true;
-          pending.attempt=Object.freeze({...pending.attempt,mcp:{...pending.attempt.mcp!,phase}});
-          this.#emit({type:'process_output',attempt:pending.attempt,stream:'stdout',text:'MCP '+phase+'\n'});
+          const attempt=Object.freeze({...pending.attempt,mcp:{...pending.attempt.mcp!,phase},
+            ...(phase==='tools/call'?{externalDispatch:'dispatching' as const}:{})});
+          const event:JobEvent={type:'process_output',attempt,stream:'stdout',text:'MCP '+phase+'\n'};
+          if (phase==='tools/call') {
+            // Invoke the publication observer synchronously. The HTTP request
+            // is never sent if its write-ahead dispatch receipt cannot commit.
+            this.#observer?.(event);
+            dispatched=true;
+          } else this.#emit(event);
+          pending.attempt=attempt;
         },
       });
       ctl.signal.throwIfAborted();
@@ -592,7 +606,7 @@ export class JobRunner {
       await writeFile(join(cwd,'artifact.json'),JSON.stringify(artifact),{flag:'wx',mode:0o400});
       if (pending.cancelBeforePublication || pending.stop || ctl.signal.aborted) {
         await rm(join(cwd,'artifact.json'));
-        this.#finish(pending,{status:pending.stop==='timed_out'?'timed_out':'cancelled',cancellation:'unknown',error:'Result publication was cancelled. Remote completion cannot be confirmed.'});
+        this.#finish(pending,{status:pending.stop==='timed_out'?'timed_out':'cancelled',cancellation:'unknown',externalFailure:'outcome_unknown',error:'Result publication was cancelled. Remote completion cannot be confirmed.'});
         return;
       }
       this.#finish(pending,{status:'succeeded',artifact});
@@ -600,7 +614,15 @@ export class JobRunner {
       const message=error instanceof Error ? error.message : 'External MCP call failed.';
       const safe=external.token ? message.replaceAll(external.token,'[redacted]') : message;
       const timedOut=pending.stop==='timed_out' || error instanceof Error && error.name==='TimeoutError';
+      let externalFailure: JobAttempt['externalFailure'];
+      if (dispatched) {
+        // A lost response or invalid receipt cannot establish whether remote side effects happened.
+        externalFailure = error instanceof ExternalMcpError && error.code === 'MCP_TOOL_FAILED' ? 'tool_error' : 'outcome_unknown';
+      } else if (pending.stop !== 'cancelled') {
+        externalFailure = timedOut || isTransientExternalConnectionError(error) ? 'connection' : 'blocked';
+      }
       this.#finish(pending,{status:timedOut?'timed_out':pending.stop==='cancelled'?'cancelled':'failed',
+        externalFailure,
         cancellation:pending.stop || timedOut ? dispatched?'unknown':'confirmed' : 'not_requested',
         error:pending.stop==='cancelled' ? dispatched?'Request cancelled locally. The external server may still have completed the operation.':undefined
           :timedOut?'External MCP call exceeded its time limit; it will not be replayed automatically.':safe});

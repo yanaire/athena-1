@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { marked } from 'marked';
 import { publicationMetadata } from './crossref.ts';
-import { manuscriptTitleHeading, typeset, type Template, type MeasuredSeries } from './typesetting.ts';
+import { manuscriptTitleHeading, typeset, typesettingDependencyReady, repairFromLatexError, TypesettingError, type TypesettingRepair, type Template, type MeasuredSeries } from './typesetting.ts';
 import { Storage } from './storage.ts';
 import { hash, ManagerError, object } from './orchestration.ts';
-import type { Context } from './orchestration.ts';
+import type { Context, Attempt } from './orchestration.ts';
 import type { ResearchReview, ResearchTarget } from './research.ts';
 
 type Ref = {sourceId:string;version:string};
@@ -16,13 +16,18 @@ export type PaperLink = {kind:'claim'|'citation'|'figure'; quote:string; sourceI
   locator:string; manuscriptOffset?:number;sourceOffset?:number; variable?:string;unit?:string;transformation?:string;caption?:string};
 type PaperVersion = {projectId:string;documentId:string;version:string;baseVersion:string|null;title:string;text:string;sha256:string;
   evidence:Ref[];links:PaperLink[];issues:string[];createdAt:string;artifact?:ResearchTarget};
-export type PaperRun = {revisionReviewId?:string;contextFileIds?:string[];sectionBriefs?:import('./manuscript-draft.ts').SectionBrief[];id:string;requestId:string;mode:'outline'|'write';context:Context;baseVersion:string|null;stage:string;
+export type PaperRun = {typesettingRepair?:boolean;revisionReviewId?:string;contextFileIds?:string[];sectionBriefs?:import('./manuscript-draft.ts').SectionBrief[];id:string;requestId:string;mode:'outline'|'write';context:Context;baseVersion:string|null;stage:string;
   outline:string[];sections:{heading:string;text:string}[];attempts:{role:string;taskId:string;attemptId:string}[];
   versions:string[];reviews:ResearchReview[];uploads:{fileId:string;sourceId:string}[];error?:string};
 type Download = {id:string;name:string;uri:string;sha256:string;bytes:number;mimeType:string};
 const rendererRevision=2;
-type Compilation = {state:'running'|'succeeded'|'failed'|'stopped';version:string;template:Template;engine:string;rendererRevision?:number;error?:string;refreshError?:string;
+type Compilation = {state:'running'|'succeeded'|'failed'|'stopped';version:string;template:Template;engine:string;rendererRevision?:number;error?:string;refreshError?:string;repair?:TypesettingRepair;
   tex?:Download;pdf?:Download;pages?:Download[];previewError?:string};
+export type PaperRecovery =
+  | {action:'resume'|'complete'}
+  | {action:'revise';version:string;reviewId:string}
+  | {action:'evidence';version:string;reviewId:string;reason:string}
+  | {action:'wait';reason:string;poll?:boolean};
 export type Paper = {workflow?:{runId:string;sessionId:string;reviewId:string;template:Template;tables?:{sourceId:string;version:string;path:string[]}[];layout?:{preamble:string[];name:string;version:string};references?:{url:string;retrievedAt:string;coverage:string;claim:string;sourceId:string}[]};id:string;projectId:string;title:string;goal:string;evidence:Ref[];outline:string[];versions:string[];runs:PaperRun[]};
 function fail(code:string,message:string):never { throw new ManagerError(code,message); }
 export function bounded(value:unknown,name:string,limit=4096):string {
@@ -124,8 +129,17 @@ export class Papers {
     });
   }
   list(project:string) {
-    return {documents:this.ids(project,'documents').map(id=>{const d=this.paper(project,id);return {id,title:d.title,currentVersion:d.versions.at(-1)??null};}),
-      sources:this.ids(project,'sources').map(id=>{const s=this.source(project,id);return {sourceId:id,version:s.version,title:s.title,level:s.level};})};
+    const documents=this.ids(project,'documents').map(id=>{
+      const d=this.paper(project,id),currentVersion=d.versions.at(-1)??null;
+      const evidence=currentVersion?this.db.get<PaperVersion>(this.key(project,'version',currentVersion))?.evidence:d.evidence;
+      return {id,title:d.title,currentVersion,evidence:evidence??[]};
+    });
+    const sources=this.ids(project,'sources').map(id=>{
+      const s=this.source(project,id),origin=s.origin;
+      return {sourceId:id,version:s.version,title:s.title,level:s.level,
+        ...(origin && 'providerId' in origin?{doi:origin.providerId}:{})};
+    });
+    return {documents,sources};
   }
   refs(project:string,value:unknown):Ref[] {
     if(!Array.isArray(value)||value.length>8) fail('INVALID_EVIDENCE','Select at most eight sources.');
@@ -156,6 +170,33 @@ export class Papers {
     const status=review?.verdict==='supported'?'approved':review?.verdict?'changes_requested':'unreviewed';
     return {...v,currentVersion:d.versions.at(-1)!,persistence:'host' as const,review:{version:key,status,reviewerId:review?.reviewer?.agentSessionId,notes:review?.verdict},assessment:review,compilation:this.compilation(project,id,v.version)};
   }
+  async recovery(paper:Paper,writing:PaperRun):Promise<PaperRecovery> {
+    const latest=paper.versions.at(-1);
+    if((latest??null)!==(writing.versions.at(-1)??writing.baseVersion))
+      return {action:'wait',reason:'The manuscript changed after this assignment. Select the edited edition to review it.'};
+    // A correction can stop before publishing. Its base belongs to the previous run.
+    if(!latest || !writing.versions.includes(latest))return {action:'resume'};
+    const v=this.version(paper.projectId,paper.id,latest),review=v.assessment;
+    if(!review)return {action:'resume'};
+    if(!review.reviewer || review.requestedBy.runId!==writing.id || review.requestedBy.sessionId!==writing.context.sessionId ||
+      this.db.record<Attempt>('attempt',review.reviewer.attemptId)?.status!=='succeeded')
+      return {action:'wait',reason:'This edition requires a settled independent review in its owning conversation.'};
+    const receipt={version:latest,reviewId:review.id};
+    if(review.verdict==='insufficient_evidence')
+      return {action:'evidence',...receipt,reason:JSON.stringify({findings:review.findings,checks:review.checks}).slice(0,8192)};
+    if(review.verdict==='changes_required')return {action:'revise',...receipt};
+    if(review.verdict!=='supported')return {action:'wait',reason:'The reviewer has not approved this edition.'};
+    const compile=v.compilation;
+    if(compile?.state==='succeeded')return {action:'complete'};
+    if(compile?.state==='running')return {action:'wait',poll:true,reason:'The approved revision is being typeset.'};
+    if(compile?.state!=='failed')return {action:'resume'};
+    if(compile.repair?.kind==='manuscript')return {action:'revise',...receipt};
+    if(compile.repair?.kind==='dependency'){
+      if(await typesettingDependencyReady(compile.repair.file))return {action:'resume'};
+      return {action:'wait',poll:true,reason:compile.error??'Restore the required LaTeX installation.'};
+    }
+    return {action:'wait',reason:compile.error??'Inspect the failed LaTeX compilation.'};
+  }
   sectionPlan(d:Paper,run:PaperRun) {
     const index=d.runs.findIndex(r=>r.id===run.id);
     if(index<0)return undefined;
@@ -167,7 +208,7 @@ export class Papers {
       if(!author.versions.includes(revision.baseVersion))continue;
       const review=this.version(d.projectId,d.id,revision.baseVersion).assessment;
       if(author.context.sessionId!==run.context.sessionId || review?.id!==revision.revisionReviewId ||
-        review.requestedBy.runId!==author.id || review.verdict!=='changes_required')break;
+        review.requestedBy.runId!==author.id || (review.verdict!=='changes_required' && !(revision.typesettingRepair && review.verdict==='supported')))break;
       if(author.sectionBriefs){
         return author.sectionBriefs.filter(b=>run.outline.includes(b.heading) &&
           b.sources.every(s=>d.evidence.some(ref=>ref.sourceId===s.sourceId&&ref.version===s.version)));
@@ -208,6 +249,7 @@ export class Papers {
   compilation(project:string,id:string,version:string) {
     const key=this.key(project,'typeset',JSON.stringify([id,version]));
     const row=this.db.get<Compilation>(key);
+    if(row?.state==='failed' && !row.repair && row.error)return {...row,repair:repairFromLatexError(row.error)};
     if(row?.state==='succeeded')return {...row,updateAvailable:row.rendererRevision!==rendererRevision};
     return row?.state==='running'&&!this.compiling.has(key)?{...row,state:'stopped' as const,error:'Host stopped before the PDF was saved.'}:row;
   }
@@ -264,7 +306,7 @@ export class Papers {
       });
     } catch(error){
       const detail=(error as Error).message;
-      this.db.set(key,previous?.state==='succeeded'?{...previous,refreshError:detail}:{...base,state:signal.aborted?'stopped':'failed',error:detail});
+      this.db.set(key,previous?.state==='succeeded'?{...previous,refreshError:detail}:{...base,state:signal.aborted?'stopped':'failed',error:detail,...(error instanceof TypesettingError && error.repair?{repair:error.repair}:{})});
       throw error;
     }
     finally{this.compiling.delete(key);}
