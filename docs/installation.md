@@ -1,6 +1,6 @@
 # Installation from source
 
-Build a revision that includes native **Intel macOS** and **Windows x64** support. The [Korean installation guide](installation.ko.md) includes complete Windows and Intel Mac steps.
+GitHub Actions verifies desktop builds on **Apple Silicon macOS** and **Windows x64**. The Intel Mac target is available for manual builds. The [Korean installation guide](installation.ko.md) includes the platform-specific commands.
 
 | Build computer | Rust target | Build command | Output |
 | --- | --- | --- | --- |
@@ -33,13 +33,13 @@ Build on Windows x64 with `npm run desktop:build:windows`, then open the generat
 
 Use supported API credentials or a compatible endpoint with the standard installer. For ChatGPT plan sign-in, build the personal local variant described below. The Windows CI job installs NSIS into a fresh disposable directory, verifies the installed runtime, starts the desktop with WebView2, quits it and runs the uninstaller. Publisher signing, SmartScreen and real-account acceptance on a user's PC have separate release checks.
 
-## Intel Mac installation
+## Manual Intel Mac installation
 
 Use native **x64 Node** on the Intel Mac and install the `x86_64-apple-darwin` Rust target. Run `npm run desktop:build:mac-intel`; the resulting `.app` contains Intel versions of the application, Node and the analysis helper. Copy the complete `Athena.app` to the desired Applications directory. An Apple Silicon `.app` is not the Intel build, and this candidate does not require Rosetta on an Intel Mac.
 
 On either Mac architecture, run `node scripts/check-macos-dmg.mjs` after `npm run desktop:build` to create a DMG under the target's `release/bundle/dmg` directory. The script verifies the image, copies the app from its read-only mount, then verifies and starts that copy with a temporary workspace. The local app has an ad hoc seal. Developer ID signing, Apple notarization and Gatekeeper distribution checks remain part of the release process. See [model providers](model-providers.md) to connect a supported model.
 
-The native CI jobs record package names and SHA-256 digests in their logs. The verification images and installers stay on the runner.
+The Apple Silicon and Windows x64 CI jobs record package names and SHA-256 digests in their logs. The verification images and installers stay on the runner.
 
 ## Personal local build with ChatGPT
 

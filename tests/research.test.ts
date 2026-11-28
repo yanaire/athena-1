@@ -254,3 +254,20 @@ test('project memory, agent-private operational memory and Books remain separate
   assert.equal(f.ledger.snapshot({ projectId: 'other-project' }).memories.agents.length, 0);
   assert.throws(() => f.ledger.snapshot({ projectId: 'other-project', sessionId: 'conversation' }), /outside this research project/);
 });
+
+test('coordinator plans require explicit ordered steps, survive retries, and retain earlier plans on revision', t => {
+  const f = setup(t);
+  const spec = {objective: 'Select a reproducible revision', acceptanceCriteria: ['A branch points to the recorded commit']};
+  assert.throws(() => f.ledger.plan(f.parent, spec, true), /Research stages/);
+  assert.throws(() => f.ledger.plan(f.author, {...spec, stages:['Inspect branches']}, true), /coordinator/);
+  const first = {...spec, stages: ['Read the refs', 'Record the SHA']};
+  const plan = f.ledger.plan(f.parent, {...first, requestId:'first'}, true);
+  assert.equal(f.ledger.plan(f.parent, {...first, requestId:'second'}, true).id, plan.id);
+  const revised = f.ledger.plan(f.parent, {...first, stages:['Resolve the release tag'], requestId:'revision'}, true);
+  assert.notEqual(revised.id, plan.id);
+  f.restart();
+  assert.deepEqual(f.snapshot().missions.slice(-2).map(m => m.stages), [first.stages, revised.stages]);
+  assert.ok(f.ledger.hasPlan(f.parent));
+  assert.equal(f.ledger.plan(f.parent, {...first, requestId:'first'}, true).id, plan.id);
+  assert.equal(f.snapshot().missions.at(-1)?.id, revised.id);
+});

@@ -42,10 +42,11 @@
 #athena-codex .aw-agent-event > summary > svg {width:14px;height:14px;flex:none;margin-top:3px;}
 #athena-codex .aw-agent-event > summary > svg:last-child {width:11px;height:11px;margin-top:5px;transition:transform .15s ease;transform:rotate(-90deg);color:var(--aw-activity-muted);}
 #athena-codex .aw-agent-event[open] > summary > svg:last-child {transform:rotate(0);}
-#athena-codex .aw-agent-copy {flex:1;min-width:0;font-size:12px;line-height:1.8;}
-#athena-codex .aw-agent-name {display:block;overflow-wrap:anywhere;}
+#athena-codex .aw-agent-copy {flex:1;display:flex;gap:8px;align-items:baseline;min-width:0;font-size:12px;line-height:1.8;}
+#athena-codex .aw-agent-name, #athena-codex .aw-tool-target {overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+#athena-codex .aw-agent-name {flex-shrink:0;max-width:100%;}
 #athena-codex .aw-agent-owner {color:var(--aw-activity-muted);}
-#athena-codex .aw-tool-activity {display:block;margin-top:3px;color:var(--aw-activity-muted);font-size:11px;line-height:1.8;overflow-wrap:anywhere;}
+
 #athena-codex .aw-agent-detail {min-width:0;padding:4px 0 15px 23px;color:var(--aw-activity-text);}
 #athena-codex .aw-activity .aw-tool-task {margin:0 0 8px;font-size:11px;line-height:1.7;}
 #athena-codex .aw-tool-context {display:flex;flex-wrap:wrap;gap:4px 18px;margin:0 0 7px;font-size:11px;line-height:1.7;}

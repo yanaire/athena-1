@@ -139,3 +139,32 @@ test('the next run resolves overrides while already-started parent and child use
   assert.deepEqual(manager.getSnapshot().attempts, before.attempts);
   assert.deepEqual(await manager.getAgentHistory(session.sessionId, session.sessionId), history);
 });
+
+test('worker reasoning is constrained by each model, persisted per role and copied into each new run selection', async t=>{
+  const directory=privateTestDirectory(join(tmpdir(),'athena-role-levels-'));
+  const providers=await ProviderManager.create(new InMemoryCredentialStore());
+  const open=()=>new ModelProfiles(directory,(provider,id)=>providers.model(provider,id));
+  let profiles=open();
+  t.after(async()=>{profiles.close();await providers.close();await rm(directory,{recursive:true,force:true});});
+  const profile=profiles.save({name:'Research reasoning',provider:'openai',modelId:'o3',thinkingLevel:'medium'});
+  profiles.setWorkerPreference('writer',profile.id,'low');
+  profiles.setWorkerPreference('reviewer',profile.id,'high');
+  profiles.setWorkerPreference('editor',profile.id,null);
+  const initial=profiles.roleModels();
+  assert.equal(initial.writer?.thinkingLevel,'low');
+  assert.equal(initial.reviewer?.thinkingLevel,'high');
+  assert.equal(initial.editor?.thinkingLevel,'medium');
+  assert.equal(initial.reviewer?.source,'role');assert.equal(initial.experiment,undefined);
+  assert.throws(()=>profiles.setWorkerPreference('reviewer',profile.id,'off'),/does not support/);
+  assert.throws(()=>profiles.setWorkerPreference('unknown',profile.id,'low'),/Unknown worker/);
+  assert.throws(()=>profiles.remove(profile.id,1),/worker role/);
+  assert.throws(()=>profiles.save({...profile,modelId:'gpt-4o',thinkingLevel:'off'}),/assigned worker reasoning/);
+  profiles.close();profiles=open();
+  assert.deepEqual(profiles.roleModels(),initial);
+  profiles.setWorkerPreference('reviewer',profile.id,'low');
+  assert.equal(initial.reviewer?.thinkingLevel,'high');
+  assert.equal(profiles.roleModels().reviewer?.thinkingLevel,'low');
+  for(const role of ['writer','editor','reviewer'])profiles.setWorkerPreference(role,null,null);
+  profiles.remove(profile.id,1);
+  assert.deepEqual(profiles.roleModels(),{});
+});

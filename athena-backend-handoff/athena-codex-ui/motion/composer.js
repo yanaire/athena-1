@@ -98,6 +98,7 @@
     let searchComposing = false, searchCompositionEndedAt = -Infinity;
     let runtimeConnected = false, runtimeSignature = '', runtimeSequence = 0;
     const runtimeRows = new Map();
+    let latestCommands = [], projectSkills = [];
     const selectedItems = new Set();
     let letters = [], chips = [], ghostOffered = false, ghostAccepting = false, ghostSuffix = null;
     let raf = 0, lastTime = 0, timers = [], statusTimer = null, measureQueued = false, ticking = false;
@@ -319,8 +320,9 @@
     function readQuery() {
       if (composing || input.selectionStart !== input.selectionEnd) return null;
       const before = input.value.slice(0, input.selectionStart);
-      const match = /(?:^|[\s(])@([^\s@]{0,64})$/u.exec(before);
-      return match ? { start: before.lastIndexOf('@'), end: input.selectionStart, text: match[1] } : null;
+      const match = /(?:^|[\s(])([@$])([^\s@$]{0,129})$/u.exec(before);
+      if (match?.[1] === '$' && /^\d/u.test(match[2])) return null;
+      return match ? { start: before.lastIndexOf(match[1]), end: input.selectionStart, trigger: match[1], text: match[2] } : null;
     }
     function filterPicker() {
       query = readQuery();
@@ -329,11 +331,16 @@
       searchBar.hidden = true;
       filterRows(query.text);
       setPickerOpen(list.length > 0); activate(activeIndex);
-      if (!list.length) live.textContent = runtimeConnected ? 'No matching files or Pi commands.' : 'No matching files, plugins, or skills.';
+      if (!list.length) live.textContent = query.trigger === '$' ? 'No matching skills.' : runtimeConnected ? 'No matching files or Pi commands.' : 'No matching files, plugins, or skills.';
     }
     function filterRows(value) {
       const search = String(value || '').trim().toLocaleLowerCase();
-      list = rows.filter(row => row.available && (row.item.action === 'upload' ? menuMode === 'add' : !search || (row.item.label + ' ' + row.item.description + ' ' + row.item.kind + ' ' + (row.item.aliases || '')).toLocaleLowerCase().includes(search)));
+      const skillsOnly = menuMode === 'mention' && query?.trigger === '$';
+      list = rows.filter(({ available, item }) => {
+        if (!available || (skillsOnly && (item.group !== 'skills' || item.action !== 'command'))) return false;
+        if (item.action === 'upload') return menuMode === 'add';
+        return !search || [item.label, item.description, item.kind, item.aliases].join(' ').toLocaleLowerCase().includes(search);
+      });
       rows.forEach(row => {
         const index = list.indexOf(row); row.on = index >= 0; row.O.t = row.on ? 1 : 0;
         row.button.hidden = !row.on;
@@ -439,6 +446,16 @@
     function pickMention() {
       const selected = list[activeIndex]; if (!pickerOpen || !selected) return;
       if (selected.item.action === 'upload') { setPickerOpen(false); fileInput.click(); return; }
+      if (selected.item.skillId) {
+        const current = menuMode === 'mention' ? readQuery() : null;
+        if (menuMode === 'mention' && (!current || current.start !== query?.start || current.text !== query.text || current.trigger !== query.trigger)) { filterPicker(); return; }
+        const start = current?.start ?? input.selectionStart;
+        const end = current ? current.end + (input.value.slice(current.end).match(/^[a-z0-9/-]+/u)?.[0].length || 0) : input.selectionEnd;
+        const space = start && !/[\s(]/u.test(input.value[start-1]) ? ' ' : '';
+        input.setRangeText(space + '$' + selected.item.skillId + ' ', start, end, 'end');
+        query = null; queryDismissed = null; setPickerOpen(false); changed(); input.focus();
+        live.textContent = selected.item.label + ' added to your draft.'; return;
+      }
       if (selected.item.action === 'command') { pickRuntimeCommand(selected.item); return; }
       if (menuMode === 'add') {
         if (selectedItems.has(selected.item.id) || hasMention(selected.item)) {
@@ -489,6 +506,7 @@
     }
     function setRuntimeCommands(commands, config = {}) {
       if (destroyed) return;
+      latestCommands = commands;
       const connected = config.connected === true;
       const normalized = [], seen = new Set();
       if (connected) for (const entry of Array.isArray(commands) ? commands : []) {
@@ -501,6 +519,10 @@
         const source = ['extension', 'prompt', 'skill'].includes(entry.source) ? entry.source : 'command';
         normalized.push({ name, source, description: String(entry.description || '').slice(0, 1200) });
         if (normalized.length >= 200) break;
+      }
+      if (connected) for (const skill of projectSkills) {
+        const name = '$' + skill.id;
+        if (!seen.has(name)) normalized.push({ name, skillId: skill.id, title: skill.name, source: 'skill', description: skill.description });
       }
       const signature = JSON.stringify([connected, hosted(), normalized]);
       if (signature === runtimeSignature) return;
@@ -516,7 +538,7 @@
         const glyph = ({ extension: 'plug', skill: 'book-open', prompt: 'file-text', command: 'slash' })[entry.source];
         const kind = ({ extension: 'Extension', skill: 'Skill', prompt: 'Prompt template', command: 'Command' })[entry.source];
         let row = runtimeRows.get(entry.name);
-        const item = { id: row?.item.id || 'runtime-command-' + (++runtimeSequence), label: '/' + entry.name, command: entry.name, source: entry.source, description: entry.description || 'Add this ' + kind.toLowerCase() + ' to your next message', kind, group, icon: glyph, action: 'command', aliases: entry.name + ' ' + kind };
+        const item = { id: row?.item.id || 'runtime-command-' + (++runtimeSequence), label: entry.skillId ? entry.name : '/' + entry.name, skillId: entry.skillId, command: entry.name, source: entry.source, description: entry.skillId ? [entry.title, entry.description].filter(Boolean).join(' · ') : entry.description || 'Add this ' + kind.toLowerCase() + ' to your next message', kind, group, icon: glyph, action: 'command', aliases: entry.name + ' ' + kind };
         if (!row) { row = createRow(item); runtimeRows.set(entry.name, row); }
         else {
           const previousIcon = row.item.icon;
@@ -542,7 +564,7 @@
         }
       }
       frame.dataset.runtimeConnected = String(connected); picker.dataset.runtimeConnected = String(connected);
-      const label = connected ? 'Add photos, files, and Pi commands' : 'Add photos, files, plugins, and skills';
+      const label = connected ? 'Add photos, files, Pi commands, and skills' : 'Add photos, files, plugins, and skills';
       trigger.setAttribute('aria-label', label); picker.setAttribute('aria-label', label);
       menuSearch.placeholder = connected ? 'Search files, commands, and skills' : 'Search files, plugins, and skills';
       menuSearch.setAttribute('aria-label', menuSearch.placeholder);
@@ -647,7 +669,7 @@
       if (busy) send.removeAttribute('aria-keyshortcuts');
       else send.setAttribute('aria-keyshortcuts', sendKey === 'mod-enter' ? 'Control+Enter Meta+Enter' : 'Enter');
       q('.acm-hint').textContent = shortcut + ' to send · ' + (sendKey === 'mod-enter' ? 'Enter for a new line' : 'Shift+Enter for a new line');
-      q('#ac-composer-help').textContent = 'Press ' + shortcut + ' to send or ' + (sendKey === 'mod-enter' ? 'Enter' : 'Shift+Enter') + ' for a new line. ' + (runtimeConnected ? 'Use the add button to choose files and Pi commands. A chosen command is added to your draft and runs only when you send it.' : 'Use the add button to choose files, plugins, and skills, or type @ to find a project item.');
+      q('#ac-composer-help').textContent = 'Press ' + shortcut + ' to send or ' + (sendKey === 'mod-enter' ? 'Enter' : 'Shift+Enter') + ' for a new line. ' + (runtimeConnected ? 'Type $ to choose a project skill, or use the add button for files and Pi commands.' : 'Use the add button to choose files, plugins, and skills, or type @ to find a project item.');
     }
     function setSendKey(mode) {
       if (destroyed) return;
@@ -685,7 +707,11 @@
         if (ghostOffered || ghostAccepting) { event.preventDefault(); endGhostAcceptance(); resetGhost(); }
         return;
       }
-      if (event.key === 'Tab' && pickerOpen) { closePicker(false); return; }
+      if (event.key === 'Tab' && pickerOpen) {
+        if (query?.trigger === '$' && !event.shiftKey) { event.preventDefault(); pickMention(); }
+        else closePicker(false);
+        return;
+      }
       if (event.key === 'Tab' && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && ghostOffered && acceptGhost()) { event.preventDefault(); return; }
       const sendCombination = sendKey === 'mod-enter' ? event.ctrlKey || event.metaKey : !event.ctrlKey && !event.metaKey;
       if (event.key === 'Enter' && !event.shiftKey && !event.altKey && sendCombination && !busy) { event.preventDefault(); if (!event.repeat) submit(); }
@@ -764,6 +790,11 @@
       closeMenu: () => closePicker(false),
       setSendKey,
       setRuntimeCommands,
+      setProjectSkills(skills) {
+        projectSkills = (skills || []).filter(s => s.enabled && s.roles?.includes('parent'));
+        setRuntimeCommands(latestCommands, {connected:runtimeConnected});
+        if (document.activeElement === input && readQuery()?.trigger === '$') filterPicker();
+      },
       getSendKey: () => sendKey,
       setValue(value) { if (destroyed) return; endGhostAcceptance(); input.value = value == null ? '' : String(value); input.setSelectionRange(input.value.length, input.value.length); queryDismissed = null; activeIndex = 0; changed(); },
       focus() { if (!destroyed) input.focus(); },

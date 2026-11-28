@@ -31,12 +31,12 @@ function isTurnAnchor(message: unknown): boolean {
 }
 
 export type DisplayAttachment = { readonly name: string; readonly mimeType: string; readonly size: number };
-export type AttachmentMessage = { readonly dispatch: string; readonly user: string; readonly attachments?: readonly DisplayAttachment[] };
+export type AttachmentMessage = { readonly dispatch: string; readonly user: string; readonly manuscriptHandoff?: boolean; readonly attachments?: readonly DisplayAttachment[] };
 
 /** Match the exact dispatch for the owning attempt, including any public redaction. */
 export function withoutAttachmentContext(message: unknown, attachment: AttachmentMessage | undefined): unknown {
   if (!attachment || !object(message) || message.role !== 'user') return message;
-  const metadata = attachment.attachments ? {attachments: attachment.attachments} : {};
+  const metadata = { ...(attachment.attachments ? {attachments: attachment.attachments} : {}), ...(attachment.manuscriptHandoff ? {manuscriptHandoff: true} : {}) };
   if (message.content === attachment.dispatch) return {...message, content: attachment.user, ...metadata};
   if (Array.isArray(message.content) && message.content.length === 1) {
     const [part] = message.content;

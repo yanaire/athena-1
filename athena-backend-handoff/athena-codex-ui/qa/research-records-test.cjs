@@ -72,7 +72,7 @@ test('project changes reject delayed document saves and keep review events versi
 function knowledge(storage = new Map()) {
   const { window, document } = parseHTML('<html><body><div id="host"></div></body></html>');
   Object.defineProperty(window.HTMLSelectElement.prototype, 'value', { configurable: true, get() { return [...this.options].find(option => option.hasAttribute('selected'))?.value || this.options[0]?.value || ''; }, set(value) { for (const option of this.options) option.toggleAttribute('selected', option.value === String(value)); } });
-  window.localStorage = { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) };
+  window.localStorage = { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
   const urls = new Set();
   const URL = { createObjectURL() { const url = 'blob:fixture-' + urls.size; urls.add(url); return url; }, revokeObjectURL(url) { urls.delete(url); } };
   vm.runInNewContext(read('ui/knowledge.js'), { window, document, AbortController, URL, Date, Intl, FileReader: class {} });
@@ -99,6 +99,53 @@ test('Knowledge keeps notes, files, search and unfinished drafts isolated by pro
   env.api.destroy(); const restored = knowledge(storage);
   assert.ok(restored.api.getState().sources.some(source => source.title === 'RC note'));
   restored.api.setProject('project-other'); assert.equal(restored.api.getState().sources[0].title, 'Other note'); restored.api.destroy();
+});
+
+test('an archived paper pin survives a reload only for the same project and edition', async () => {
+  const storage = new Map();
+  let version = 'first';
+  const service = { async listSources({projectId}) {
+    return {sources: [{projectId,sourceId:'paper-1',version,title:'Measurements',kind:'documents',format:'Paper',
+      persistence:'host',originalLocation:{uri:'project://'+projectId+'/papers/1'}}]};
+  }};
+  async function open(projectId) {
+    const env = knowledge(storage);
+    env.api.setProject(projectId);
+    env.api.attachRecords(service);
+    await env.wait(() => env.api.getState().sources.some(source => source.id === 'paper-1'));
+    env.click('[data-akn-source="paper-1"]');
+    return env;
+  }
+  const pinned = env => env.q('[data-akn-action="pin"]').getAttribute('aria-pressed') === 'true';
+  let env = await open('first-project');
+  env.click('[data-akn-action="pin"]'); assert.ok(pinned(env)); env.api.destroy();
+  env = await open('another-project'); assert.equal(pinned(env),false); env.api.destroy();
+  env = await open('first-project'); assert.ok(pinned(env));
+  version = 'second';
+  await env.api.refreshSources(); assert.equal(pinned(env),false);
+  version = 'first';
+  await env.api.refreshSources(); assert.ok(pinned(env));
+  env.click('[data-akn-action="pin"]'); env.api.destroy();
+  env = await open('first-project'); assert.equal(pinned(env),false); env.api.destroy();
+});
+
+test('a note stored by the project service keeps its device pin selection across reload', async () => {
+  const storage = new Map(), env = knowledge(storage);
+  addNote(env,'Protocol','Measured in triplicate.');
+  env.click('[data-akn-action="pin"]');
+  const sourceId=env.api.getState().selectedId;
+  const receipt={projectId:'project-rc',sourceId,version:'1',title:'Protocol',kind:'notes',format:'NOTE',
+    persistence:'host',originalLocation:{uri:'project://project-rc/originals/note'}};
+  env.api.attachRecords({ storeSource: async () => receipt });
+  env.click('[data-akn-action="store-original"]');
+  await env.wait(() => env.api.getState().sources.find(item => item.id === sourceId)?.persistence === 'host');
+  env.click('[data-akn-action="pin"]');
+  env.api.destroy();
+  const restored = knowledge(storage);
+  restored.api.attachRecords({ listSources: async () => ({sources:[receipt]}) });
+  await restored.wait(() => restored.api.getState().sources.find(item => item.id === sourceId)?.persistence === 'host');
+  assert.equal(restored.api.getState().sources.find(item => item.id === sourceId).pinned,false);
+  restored.api.destroy();
 });
 
 test('Knowledge hands off original bytes explicitly, separates PDF preview/extraction, and preserves prior-version reviews', async () => {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
-import {mkdir, mkdtemp, readdir, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readdir, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -24,6 +24,19 @@ async function fixture(t:TestContext,opts:Partial<CsvJobRunnerOptions>={}) {
 function alive(pid: number): boolean {
   try { process.kill(pid, 0); return true; }
   catch (error) { if (error instanceof Error && 'code' in error && error.code === 'ESRCH') return false; throw error; }
+}
+
+async function orphanExited(pid: number): Promise<boolean> {
+  if (!alive(pid)) return true;
+  if (process.platform !== 'linux') return false;
+  // Some container init processes leave exited orphans visible to kill(pid, 0).
+  try {
+    const status = await readFile(`/proc/${pid}/status`, 'utf8');
+    return /^State:\s+Z\b/m.test(status);
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && (error.code === 'ENOENT' || error.code === 'ESRCH')) return !alive(pid);
+    throw error;
+  }
 }
 
 test('analysis rejects a script with an extension mismatched to the selected interpreter',async t=>{
@@ -218,5 +231,5 @@ test('killing the Node host closes the sandbox liveness pipe',live,async t=>{
   let diagnostic=''; child.stderr.on('data',chunk=>{diagnostic+=chunk;});
   const died=once(child,'exit'); const id=await Promise.race([once(child.stdout,'data').then(([bytes])=>String(bytes).trim()),died.then(()=>{throw new Error('host died before ready: '+diagnostic);})]);
   assert.match(id,/^[1-9]\d*$/);const pid=Number(id);assert.equal(alive(pid),true);child.kill('SIGKILL');await died;
-  const end=Date.now()+4000; while(alive(pid)) {assert.ok(Date.now()<end,'sandbox did not exit after liveness pipe closed');await delay(50);}
+  const end=Date.now()+4000; while(!(await orphanExited(pid))) {assert.ok(Date.now()<end,'sandbox did not exit after liveness pipe closed');await delay(50);}
 });

@@ -23,7 +23,7 @@ const message = (role, content, athena, timestamp) => ({ role, content, ...(athe
 function historyRun(context, start, title = 'Compare the measurement') {
   return [message('user', title, context, start), message('assistant', [{ type: 'text', text: 'I will inspect the file.' }, { type: 'toolCall', id: 'call-' + context.runId, name: 'spawn_agent', arguments: { title: 'Calculate voltage statistics' } }], context, start + 10), { ...message('toolResult', [{ type: 'text', text: '{"taskId":"private-task-value"}' }], context, start + 20), toolCallId: 'call-' + context.runId, isError: false }, message('assistant', 'The result is ready.', context, start + 100)];
 }
-const order = host => [...host.children].filter(node => !node.hidden).map(node => node.dataset.awAttempt ? 'attempt:' + node.dataset.awAttempt : node.dataset.role === 'user' ? 'user:' + node.querySelector('p').textContent : node.dataset.role === 'assistant' ? 'text:' + node.querySelector('p').textContent : node.querySelector('[data-ap-tool]') ? 'tool:' + node.querySelector('[data-ap-tool]').dataset.apTool : 'other');
+const order = host => [...host.children].flatMap(node => node.matches('.ac-stream-activity') ? [...node.querySelector('.ac-stream-steps').children] : [node]).filter(node => !node.hidden).map(node => node.dataset.awAttempt ? 'attempt:' + node.dataset.awAttempt : node.dataset.role === 'user' ? 'user:' + node.querySelector('p').textContent : node.dataset.role === 'assistant' ? 'text:' + node.querySelector('p').textContent : node.querySelector('[data-ap-tool]') ? 'tool:' + node.querySelector('[data-ap-tool]').dataset.apTool : 'other');
 
 test('verified attachment labels survive history hydration including an attachment-only message', () => {
   const e = environment(), context = owner();
@@ -161,13 +161,46 @@ test('child attempts stay with the originating request; retries preserve prior f
   } finally { chrome.destroy(); e.close(); }
 });
 
+test('consecutive actions are folded together between public messages, with separate disclosure for each turn', () => {
+  const e = environment(), first = owner(), second = owner('run-two','parent-two');
+  try {
+    const records = historyRun(first, 10);
+    records[1].content.push({type:'toolCall', id:'other-call', name:'read', arguments:{path:'data.csv'}});
+    e.view.history([...records, ...historyRun(second, 300)]);
+    const groups=() => [...e.host.querySelectorAll('.ac-stream-activity')];
+    assert.equal(groups().length,2);
+    assert.match(groups()[0].firstElementChild.textContent,/2 steps/);
+    assert.ok(groups().every(group=>!group.open));
+    assert.equal(e.host.querySelector('[data-role="assistant"] .ac-stream-text').closest('details'),null);
+    groups()[0].open=true;
+    e.view.history([...records, ...historyRun(second, 300)]);
+    assert.equal(groups()[0].open,true);assert.equal(groups()[1].open,false);
+    e.view.revealTool('call-run-two');
+    assert.equal(groups()[1].open,true);
+  } finally { e.close(); }
+});
+
+test('a settled history refresh preserves the opened call only in its owning attempt', () => {
+  const e = environment(), first = owner(), records = historyRun(first, 100);
+  try {
+    e.view.history(records);
+    const row = () => e.host.querySelector('[data-ap-tool]');
+    row().open = true; row().querySelector('[data-aw-diagnostics]').open = true;
+    e.view.history(records);
+    assert.equal(row().open, true);
+    assert.equal(row().querySelector('[data-aw-diagnostics]').open, true);
+    e.view.history(historyRun(owner('run-one', 'another-attempt'), 300));
+    assert.equal(row().open, false);
+  } finally { e.close(); }
+});
+
 test('unmatched ownership is kept in fallback and session/branch changes remove prior inline activity', () => {
   const e = environment(), context = owner();
   try {
     e.view.history(historyRun(context, 100));
     const card = e.document.createElement('section'); card.dataset.awAttempt = 'attempt-child'; card.textContent = 'Original child work';
     e.view.placeActivity(card, { runId: context.runId, attemptId: 'attempt-child', at: 130 });
-    assert.equal(card.parentElement, e.host);
+    assert.ok(e.host.contains(card));
     e.view.history([message('user', 'Unknown owner'), message('assistant', 'Legacy answer')]);
     assert.equal(card.parentElement, e.fallback, 'An unmatched history branch does not leave stale work under a new turn.');
     const replacement = e.document.createElement('section'); replacement.dataset.awAttempt = 'attempt-child';

@@ -53,7 +53,7 @@
     const profileById = id => id && profilesList ? array(profilesList.profiles).find(item => item.id === id) || null : null;
     const currentProfile = () => profilesAdapter && profilesList ? profileById(profileContext?.profileId)
       || profileById(profileContext?.projectDefaultProfileId) || profileById(profilesList.appDefaultProfileId) : null;
-    const profileGated = kind => options.isSessionBound?.() === false || !profileContext?.sessionId || activeWork() || changing() || kind === 'reasoning' && levelsLoading;
+    const profileGated = kind => options.isSessionBound?.() === false || !profileContext?.sessionId || (!profileContext.researchWorkflow&&activeWork()) || changing() || kind === 'reasoning' && levelsLoading;
 
     function position() {
       if (!open || destroyed) return;
@@ -82,10 +82,15 @@
       if (profilesAdapter) {
         const profile = currentProfile();
         const host = profilesList?.hostModel;
-        const name = !bound ? 'Connect session' : profile?.name || (host ? [host.name || host.modelId || host.id, host.provider].filter(Boolean).join(' · ') : 'Choose model');
+        const name = !profileContext?.sessionId ? 'No conversation' : !bound ? 'Connect session' : profile?.name || (host ? [host.name || host.modelId || host.id, host.provider].filter(Boolean).join(' · ') : 'Choose model');
         modelLabel.textContent = name;
         modelTrigger.setAttribute('aria-label', 'Choose model' + (name !== 'Choose model' ? ': ' + name : ''));
-        modelTrigger.title = profile ? [profile.name, profile.provider, profile.modelId].filter(Boolean).join(' · ') : name;
+        modelTrigger.title = profile ? [profileContext?.profileId?'Conversation':profileContext?.projectDefaultProfileId?'Inherited from project':'Inherited from app',profile.name, profile.provider, profile.modelId].filter(Boolean).join(' · ') : name;
+        const account=profile?.authMode==='chatgpt'&&profilesList?.accountStates?.find(a=>a.authRef===profile.authRef);
+        if(profile?.authMode==='chatgpt'&&profilesList?.accountStates&&(!account||account.state!=='connected'||account.planUsage!=='enabled')){
+          modelLabel.textContent=name+' · '+(account?.state==='connected'?'Enable plan usage':'Sign in');
+          modelTrigger.title=modelLabel.textContent;
+        }
         const level = profile?.thinkingLevel;
         reasoningLabel.textContent = level ? 'Reasoning · ' + levelInfo(level)[0] : 'Reasoning';
         reasoningTrigger.setAttribute('aria-label', 'Choose reasoning level' + (level ? ': ' + levelInfo(level)[0] : ''));
@@ -147,7 +152,7 @@
       }
       q('.acmp-refresh').setAttribute('aria-label', open === 'model' ? 'Refresh available models' : 'Refresh reasoning levels');
       errorNode.textContent = error; errorNode.hidden = !error;
-      const reason = changing() ? 'Applying your selection…' : activeWork() ? 'You can change these after the current reply finishes.' : open === 'reasoning' && snapshot.thinkingLevelsPending ? 'Checking this model’s reasoning levels…' : loading ? 'Refreshing available choices…' : '';
+      const reason = changing() ? 'Applying your selection…' : activeWork() ? profileContext?.researchWorkflow?'Changes apply to the next research request.':'You can change these after the current reply finishes.' : open === 'reasoning' && snapshot.thinkingLevelsPending ? 'Checking this model’s reasoning levels…' : loading ? 'Refreshing available choices…' : '';
       notice.textContent = reason; notice.hidden = !reason;
       list.replaceChildren(); empty.hidden = true;
       if (profilesAdapter && !profileContext?.sessionId) {
@@ -159,7 +164,8 @@
           const profiles = profilesList ? array(profilesList.profiles) : [];
           const terms = search.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
           const match = profile => terms.every(term => [profile.name, profile.id, profile.provider, profile.modelId].join(' ').toLocaleLowerCase().includes(term));
-          const fallback = profilesList?.appDefaultProfileId ? 'Falls back to ' + (profileById(profilesList.appDefaultProfileId)?.name || 'the app default profile') : 'No app default profile selected yet';
+          const projectProfile=profileById(profileContext?.projectDefaultProfileId);
+          const fallback = projectProfile ? 'Project · '+projectProfile.name+' · '+projectProfile.modelId : profilesList?.appDefaultProfileId ? 'Falls back to ' + (profileById(profilesList.appDefaultProfileId)?.name || 'the app default profile') : 'Host · '+(profilesList?.hostModel?.modelId||'No configured host model');
           addOption('inherit\u241f', 'Inherit default', fallback, 'circle-dashed', !profileContext?.profileId);
           const matches = profiles.filter(match);
           for (const profile of matches) {

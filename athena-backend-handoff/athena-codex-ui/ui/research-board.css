@@ -42,3 +42,13 @@
 #athena-codex .arb-error { color: #954b40; background: #fff2ed; border: 1px solid #e9cfc8; border-radius: 6px; padding: 8px; }
 #athena-codex .arb-panel :is(button,input,textarea,select,summary):focus-visible { outline: 2px solid #808977; outline-offset: 3px; }
 @media (max-width: 600px) { #athena-codex .arb-card-heading { flex-wrap: wrap; } }
+
+#ac-research-flow [data-flow-tab][aria-pressed=true]{font-weight:700;text-decoration:underline}
+.ac-flow-stages{padding-left:1.35em}.ac-flow-stages li{margin:.6em 0}.ac-flow-stages summary{cursor:pointer}.ac-flow-stages summary span{float:right;font-size:.83em}
+.ac-flow-stages [data-state=Succeeded]{color:#347050}.ac-flow-stages [data-state=Failed]{color:#933b29}
+#ac-research-flow p,#ac-research-flow pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.ac-flow-page{display:block;width:100%;height:auto;margin-top:12px;border:1px solid #d9d8cc}
+#ac-research-flow table{font-size:.85em;border-spacing:8px 2px}.ac-flow-chart{display:flex;gap:3px;height:50px;margin:4px 0 8px}.ac-flow-chart span{position:relative;width:14px}.ac-flow-chart i{position:absolute;left:0;right:0;background:#487967}
+
+#ac-view-manuscript[data-guided=true][data-editor-open=false]>:not(#ac-research-flow){display:none}
+#ac-live-projects small.ac-project-empty{display:block;overflow-wrap:anywhere}

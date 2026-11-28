@@ -32,7 +32,7 @@ export class Journal {
   accept(a:Attempt,title:string) {
     this.db.putRecord('attempt',a);
     const old=this.db.record<TaskRow>('task',a.taskId);
-    const role=a.parentTaskId?'worker':'coordinator';
+    const role=a.parentTaskId?(a.workerRole??'worker'):'coordinator';
     this.db.putRecord('task',{...context(a),id:a.taskId,title,role,status:'queued',dependencies:[],
       toolIds:old?.toolIds??[],artifactIds:old?.artifactIds??[]} satisfies TaskRow);
     this.db.putRecord('agent',{...context(a),id:a.taskId,name:title,role,status:'queued',...(a.model?{model:a.model}:{})});

@@ -89,7 +89,7 @@
       rows.clear(); lastSnapshot = null; error.textContent = ''; error.hidden = true; if (!options.managedLayout) host.hidden = true;
     }
     reset();
-    return Object.freeze({ render, refresh() { if (lastSnapshot) render(lastSnapshot); }, reset, getToolElement: id => rows.get(id)?.element || null, revealTool(id) { const row = [...rows.values()].find(item => item.tool?.toolCallId === id || item.tool?.id === id); if (!row) return false; row.element.open = true; row.element.querySelector('summary').focus({preventScroll:true}); row.element.scrollIntoView?.({block:'nearest'}); return true; }, destroy() { if (destroyed) return; destroyed = true; controller.abort(); reset(); error.remove(); } });
+    return Object.freeze({ render, refresh() { if (lastSnapshot) render(lastSnapshot); }, reset, getToolElement: id => rows.get(id)?.element || null, revealTool(id) { const row = [...rows.values()].find(item => item.tool?.toolCallId === id || item.tool?.id === id); if (!row) return false; const group = row.element.closest('.ac-stream-activity'); if (group) group.open = true; row.element.open = true; row.element.querySelector('summary').focus({preventScroll:true}); row.element.scrollIntoView?.({block:'nearest'}); return true; }, destroy() { if (destroyed) return; destroyed = true; controller.abort(); reset(); error.remove(); } });
   }
   window.AthenaPiSessionView = Object.freeze({ mount });
 })();

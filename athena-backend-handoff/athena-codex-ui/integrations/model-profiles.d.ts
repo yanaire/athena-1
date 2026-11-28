@@ -45,6 +45,7 @@ export type ModelProfile = ModelReference & {
   readonly id: string;
   readonly name: string;
   readonly revision: number;
+  readonly supportedLevels?: readonly ThinkingLevel[];
   readonly thinkingLevel: ThinkingLevel;
   readonly endpoint?: string;
   readonly authRef: string;
@@ -60,14 +61,17 @@ export type ModelCheck = {
 export type ResolvedModelReference = ModelReference & {
   readonly profileId?: string;
   readonly configurationRevision?: number;
-  readonly source?: 'conversation' | 'project' | 'app' | 'host';
+  readonly source?: 'conversation' | 'project' | 'app' | 'host' | 'role';
   readonly endpoint?: string;
   readonly api?: string;
   readonly authMode?: 'chatgpt';
   readonly authRef?: string;
 };
 export type ModelProfileInput = Pick<ModelProfile, 'name' | 'provider' | 'modelId'> & Partial<Pick<ModelProfile, 'id' | 'revision' | 'thinkingLevel' | 'authMode'>> & { readonly accountRef?: string };
+export type WorkerRoleKey = 'worker' | 'mission' | 'literature' | 'experiment' | 'verification' | 'writer' | 'editor' | 'reviewer';
+export type WorkerModelPreference = { readonly role: WorkerRoleKey; readonly profileId: string | null; readonly thinkingLevel: ThinkingLevel | null };
 export type ModelProfileList = {
+  readonly workerRoles?: readonly (WorkerModelPreference & {readonly label:string})[];
   readonly profiles: readonly ModelProfile[];
   readonly appDefaultProfileId: string | null;
   readonly credentialMode: 'local_file' | 'keychain' | 'operator_key' | 'memory';

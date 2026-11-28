@@ -301,12 +301,17 @@ export async function createPiSession(options: PiSessionOptions) {
       });
     },
     /** Completion promise, unlike command(prompt)'s early acceptance response. */
-    async prompt(message: string, options?: { readonly kind?: 'reconciliation' }): Promise<void> {
+    async prompt(message: string, options?: { readonly kind?: 'reconciliation'; readonly skillContext?:string }): Promise<void> {
       await assertPromptReady();
       try {
         if (options?.kind === 'reconciliation') {
           await session.sendCustomMessage({ customType: 'athena-reconciliation', content: message, display: false, details: undefined }, { triggerTurn: true });
-        } else await session.prompt(message, { expandPromptTemplates: false, source: "rpc" });
+        } else {
+          if (options?.skillContext) {
+            await session.sendCustomMessage({ customType: 'athena-selected-skills', content: options.skillContext, display: false, details: undefined });
+          }
+          await session.prompt(message, { expandPromptTemplates: false, source: "rpc" });
+        }
       } catch (error) {
         if (error instanceof Error) throw new PiRuntimeError(String(publicValue(error.message, redact)));
         throw error;

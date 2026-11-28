@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { privateTestDirectory } from './platform-test-helpers.ts';
 import { Storage } from '../runtime/storage.ts';
-import { BUILTIN_SKILLS_ID, ExtensionStore, emptyExtensionPin, validatePluginManifest } from '../runtime/extensions.ts';
+import { BUILTIN_SKILLS_ID, ExtensionStore, emptyExtensionPin, mentionedSkills, validatePluginManifest } from '../runtime/extensions.ts';
 import type { PluginManifest } from '../runtime/extensions.ts';
 import { externalConfigurationDigest, externalVerificationDigest } from '../runtime/external-mcp-client.ts';
 import type { ExternalServerDefinition, ExternalVerification } from '../runtime/external-mcp-client.ts';
@@ -206,4 +206,51 @@ test('catalog body tampering and directory symlinks cannot silently replace the 
     symlinkSync(outside, path);
     assert.throws(() => new ExtensionStore(s.storage, { catalogDirectory: copy }), /reviewed directory/);
   } finally { rmSync(copy, { recursive: true, force: true }); s.close(); }
+});
+
+test('chat skill mentions use the admitted project and role, and ignore literal text', () => {
+  const s = setup();
+  try {
+    const installed = () => s.store.snapshot('project-a').skills;
+    const extension = { ...plugin, skills: [
+      ...plugin.skills!,
+      { ...plugin.skills![0]!, id: 'measure', roles: ['parent' as const] },
+    ] };
+    s.store.install('project-a', extension);
+    s.store.setEnabled('project-a', plugin.id, true);
+    const pin = s.store.pin('project-a');
+    const prompt = [
+      '($lab-procedures/measure), $athena-data-quality! $lab-procedures/measure',
+      '`$lab-procedures/check-sample`',
+      '```text', '$lab-procedures/check-sample', '```',
+      'cost $25; variables $x and \\$lab-procedures/check-sample.',
+      'foo$lab-procedures/check-sample $lab-procedures/check-sample-other',
+    ].join('\n');
+    assert.deepEqual(mentionedSkills(prompt, pin, installed), ['lab-procedures/measure', 'athena-data-quality']);
+    assert.throws(() => mentionedSkills('$lab-procedures/check-sample', pin, installed), /workers only/);
+    s.store.setEnabled('project-a', plugin.id, false);
+    assert.throws(() => mentionedSkills('$lab-procedures/measure', s.store.pin('project-a'), installed), /Enable/);
+    assert.deepEqual(mentionedSkills('$lab-procedures/measure', pin, installed), ['lab-procedures/measure']);
+  } finally { s.close(); }
+});
+
+test('GitHub installer pins the official readonly endpoint and isolates installation per project', () => {
+  const s = setup();
+  try {
+    const initial = s.store.installGitHub('project-a', 0);
+    const github = initial.plugins.find(plugin => plugin.id === 'athena-github')!;
+    assert.equal(github.enabled, false);
+    assert.equal(github.servers.length, 1);
+    const [server] = github.servers;
+    assert.equal(server!.url, 'https://api.githubcopilot.com/mcp/x/repos/readonly');
+    assert.deepEqual(server!.allowedTools, ['search_repositories','list_branches','list_commits']);
+    assert.equal(server!.auth, 'bearer');
+    assert.equal(s.store.installGitHub('project-a', initial.revision).revision, initial.revision);
+    assert.throws(() => s.store.setEnabled('project-a', github.id, true), /verification/);
+    assert.throws(() => s.store.install('project-a', {...plugin, id: github.id}), /reserved/);
+    assert.equal(s.store.snapshot('project-b').plugins.some(p => p.id === github.id), false);
+    const reopened = new ExtensionStore(s.storage);
+    assert.deepEqual(reopened.snapshot('project-a'), initial);
+    assert.equal(reopened.remove('project-a', github.id, initial.revision).plugins.some(p => p.id === github.id), false);
+  } finally {s.close();}
 });

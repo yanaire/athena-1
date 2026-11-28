@@ -644,6 +644,11 @@ test('Hosted retry rejection stays beside the task and reuses the same request f
   const host = hostedFixture({ recovery: true }); host.retryError = 'Wait for the active run to finish.';
   const env = createEnvironment({ host }); host.stream.open();
   await env.waitFor(() => env.state().workspace.capabilities?.retryTask);
+  const attempt = env.q('[data-aw-task-details="interrupted-child"]').closest('[data-aw-attempt]');
+  assert.equal(attempt.open, false);
+  const activity = attempt.closest('.ac-stream-activity');
+  if (activity && !activity.open) env.click(activity.querySelector('summary'));
+  env.click(attempt.querySelector('summary'));
   env.click('[data-aw-task-details="interrupted-child"]');
   assert.equal(env.state().workspaceView.taskId, 'interrupted-child');
   env.click('[data-awv-retry="interrupted-child"]');
@@ -725,7 +730,9 @@ test('A delayed initial history read cannot erase live work; fresh history resto
   const texts = env.qa('#ac-pi-transcript article p').map(node => node.textContent);
   assert.deepEqual(texts, ['Earlier question', 'Earlier answer', user.content, 'Inspecting the assigned file.', 'The file was inspected.']);
   const flow = [...env.q('#ac-pi-transcript').children].filter(node => !node.hidden);
-  assert.ok(flow.indexOf(env.q('[data-ap-tool="timeline-read"]').parentElement) < flow.indexOf(env.qa('#ac-pi-transcript article').at(-1)));
+  const activity = env.q('[data-ap-tool="timeline-read"]').closest('.ac-stream-activity');
+  assert.ok(flow.includes(activity));
+  assert.ok(flow.indexOf(activity) < flow.indexOf(env.qa('#ac-pi-transcript article').at(-1)));
   assert.equal(env.q('#ac-live-user').hidden, true);
   env.destroy();
 });
@@ -1172,6 +1179,8 @@ test('Pi inline tool rows preserve disclosure, focus and output identity while s
     assert.ok(row && row.matches('details'));
     assert.equal(slot.querySelectorAll('img,script,[onerror]').length, 0);
     assert.match(row.querySelector('.ap-tool-target').textContent, /<img onerror=bad\(\)>/);
+    const group = row.closest('.ac-stream-activity');
+    if (group && !group.open) env.click(group.querySelector('summary'));
     env.click(row.querySelector('summary'));
     assert.equal(row.open, true);
     const rawDetails = row.querySelector('[data-aw-diagnostics]');
@@ -1227,6 +1236,7 @@ test('Shell Pi events update inline phases and tool rows and remain busy until s
   const row = env.q('[data-ap-tool="shell-read"]');
   assert.ok(env.q('#ac-conversation').contains(row));
   assert.equal(env.state().panelOpen, false);
+  env.click(row.closest('.ac-stream-activity').querySelector('summary'));
   env.click('[data-ap-tool-summary="shell-read"]');
   emit({ type: 'tool_execution_update', toolCallId: 'shell-read', toolName: 'read', partialResult: { content: [{ type: 'text', text: 'Actual event output' }] } });
   assert.equal(env.q('[data-ap-tool="shell-read"]'), row);

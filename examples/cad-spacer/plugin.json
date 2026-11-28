@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "cad-spacer",
+  "name": "CadQuery spacer study",
+  "version": "1.0.0",
+  "description": "Model annular spacers and measure their STEP geometry using a local CadQuery program.",
+  "skills": [{
+    "id": "measure",
+    "name": "CAD spacer experiment",
+    "description": "Sweep spacer bore diameters, compare solid volumes and retain the exported STEP models.",
+    "version": "1.0.0",
+    "roles": ["parent"],
+    "requiredCapabilities": ["spawn_agent", "wait_for_agents"],
+    "body": "Keep all linear dimensions in millimetres. Delegate model_spacers to an experiment worker using the verified cad-spacer/kernel connection. Join its published receipt. Check the imported STEP volumes against pi * height * (outer_diameter^2 - bore_diameter^2) / 4. Report discrepancies and the actual result artifact."
+  }],
+  "mcpServers": [{
+    "id": "kernel",
+    "name": "CadQuery / Open CASCADE",
+    "capability": "program",
+    "transport": "streamable-http",
+    "url": "http://127.0.0.1:14791/mcp",
+    "allowedTools": ["model_spacers"],
+    "auth": "none",
+    "timeoutMs": 30000
+  }]
+}

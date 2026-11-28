@@ -8,6 +8,74 @@ the reusable research direction described in Tencent's
 It does not import a Hyra agent framework or claim to reproduce Tencent's internal
 research infrastructure.
 
+## Running a study from chat
+
+For new research runs the selected main model writes the study objective, ordered
+steps and acceptance criteria through `plan_research`. It may inspect granted inputs
+and existing project papers while planning. TaskManager requires a saved plan before
+delegating work or starting a remote search. Expand **Research progress → Research
+plan** to see the steps and criteria sent by the coordinator. A revised plan is
+recorded alongside earlier plans in the research board.
+
+Create a project with the research option selected and choose its local work folder if desired. The host records the resolved directory and Git branch. Attach each input through the composer to grant access. The first conversation opens immediately. Choose the model and reasoning level, attach the data or supported LaTeX template, and send the research question. Changes to the conversation model apply to the next request.
+
+The **Research progress** tab reads the plan, bibliography, tool calls, condition tables, review receipts and compilation from TaskManager. Expand a stage to open the worker and its attempts in Workflow. Select a condition table to inspect the producing program, result version and its granted original inputs. **Manuscript preview** shows saved preliminary sections during the experiment, then the reviewed revision, compiled pages, source links and downloads. The existing editor remains available there.
+
+The coordinator can search public Crossref using the project's research permission. A verified external MCP with a `browser` or `computer` capability can read pages or operate a GUI using its declared tools. Enable and check that connection in Settings. System-browser navigation has its own history. A citation to a visited page needs the URL and quoted text in the returned tool receipt. The host records the retrieval time and scope. Crossref citations retain the DOI and the metadata or abstract actually received.
+
+In **Settings → Models & connections → Worker models**, assign a saved profile and an optional supported reasoning level to general work, literature research, mission planning, experiments, verification, manuscript writing, editing and independent manuscript review. An unassigned role inherits the effective conversation model. TaskManager snapshots the assignments and their account references when accepting the request. Editing them affects the next request. The linked manuscript run keeps the same assignments.
+
+The coordinator or a literature worker can search by public topic or DOI. The host saves a readable note for each retrieved record under `Athena Library/<project ID>/` in the chosen folder. Projects without a selected folder use their own Athena-managed project directory. Supported open originals include Europe PMC article XML, arXiv PDFs resolved from arXiv DOIs, and JOSS publisher PDFs. When the original is unavailable, Knowledge shows the metadata or abstract obtained. PDF text indexing uses the local `pdftotext` program when available. The original download is verified against its stored SHA-256.
+
+Open **Knowledge** to inspect, search or download these editions. A later conversation can use `search_project_library` and `read_project_paper` to retrieve the stored text and pass the exact source ID and version to the manuscript. Different projects can share a parent folder and retain separate libraries. The optional live browser acceptance test in `qa/library-roles-browser-test.mjs` (under the frontend package) exercises publisher retrieval, on-disk storage, model routing and reuse after restart.
+
+Once the experimental reviewer supports exact output versions, the coordinator hands those results and their sources to the manuscript run. `record_experiment_table` resolves an array within a versioned JSON artifact to count the actual conditions. Paused work can be resumed at the latest saved checkpoint in its conversation. A repeated resume uses its existing receipt. An edited manuscript revision needs its own review and compilation.
+
+## Adaptive experiment missions
+
+For a quantitative question with a stopping criterion, the main coordinator can call
+`run_experiment_mission` after saving its research plan. It supplies the plan ID,
+fixed protocol and units, a result filename and JSON path, threshold and direction,
+explicit input grants and a budget of one to eight trials. A plugin measurement
+can specify an enabled server and tool. The host checks the producing invocation
+on every trial. Each research run supports one fixed contract.
+
+The experiment mission planner is a separate Pi session with a selectable model
+and reasoning level in model settings. It receives the research objective and
+prior measured outcomes and the worker's observations about its method. It returns either a new experiment instruction with a
+reason and optional parent trial, or a reason to stop. TaskManager schedules the
+planner and the experiment worker as direct children and reuses their sessions.
+A selected parent trial can grant its pinned result to the next worker.
+
+TaskManager reads the numeric metric from exactly one matching artifact produced
+by the accepted worker attempt. It stores the version, digest, process identity,
+input versions and evidence ID. Missing or ambiguous outputs count as trials.
+The planner can change course after a miss. The host stops at the threshold or
+trial limit. A separate reviewer checks the scientific method and the original
+evidence before the manuscript handoff. Expand **Experiment** in the research
+panel to see the decisions, parent trials, results and best measurement.
+
+The SQLite checkpoint includes the accepted planner and worker attempts. Opening
+the latest conversation and selecting **Resume from saved checkpoint** reconciles
+an interrupted run. Completed measurements and evidence receipts are reused.
+A terminal mission tool call returns its stored outcome. Waiting for a child
+releases the coordinator's model slot.
+
+The division of research responsibilities follows the published Hyra 2.0 design.
+The fixed metric and best-result record draw on autoresearch. Explicit parent
+trials preserve a branch history as in AI Scientist-v2. Athena executes one
+new measurement at a time. [Hyra 2.0](https://hy.tencent.ai/research/hyra2) ·
+[autoresearch experiment protocol](https://github.com/karpathy/autoresearch/blob/master/program.md) ·
+[AI Scientist-v2](https://github.com/SakanaAI/AI-Scientist-v2)
+
+The browser acceptance scenario uses the CadQuery example plugin, Playwright,
+a local controlled model provider and the article template. Run
+`node athena-backend-handoff/athena-codex-ui/qa/mission-browser-test.mjs`
+from the repository root. Set `ATHENA_MISSION_CASE` to `budget`, `missing`, `restart` or
+`routing` to exercise exhaustion, missing measurements, single-slot recovery during
+planning or run-pinned planner model selection.
+`ATHENA_BROWSER_EVIDENCE` selects the recording and receipt directory.
+
 ## Implemented flow
 
 1. The coordinator records the question, acceptance criteria and planned stages
@@ -178,3 +246,13 @@ records a method, and reloads the same evidence and decisions after restart.
 Changed input, malformed CSV, missing evidence, cancelled reviewer, failed
 reproduction and changed output bytes must remain visible as their actual
 outcomes. No unobserved external MCP or native-account case is marked passed.
+
+## Replaying the browser verification
+
+With Node 24, the prepared WASI runtime, a local TeX installation and Poppler available, install the QA folder's locked dependencies and Playwright Chromium. From the repository root run:
+
+```sh
+node athena-backend-handoff/athena-codex-ui/qa/research-browser-test.mjs
+```
+
+The scenario drives the served workspace and real host with a controlled Pi-compatible model provider. It records a WebM, screenshots, downloaded PDF, TeX, review manifest and checkpoint assertions under the directory it prints. Set `ATHENA_BROWSER_EVIDENCE` for a specific output directory and `ATHENA_CHROMIUM` for an existing Chromium executable. `ATHENA_LATEX_TEMPLATE_FILE` selects an attached template. `ATHENA_PUBLIC_METHOD=1` reads the pinned public reference, and `ATHENA_INTERRUPT_REVIEW=1` exercises cancellation and host restart during review. On Linux, `ATHENA_GUI_CHECK=1` exercises the independent calculator window with Python Tk, Xvfb and XTest.

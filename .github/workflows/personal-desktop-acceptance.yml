@@ -31,11 +31,6 @@ jobs:
             platform: darwin
             arch: arm64
             target: aarch64-apple-darwin
-          - name: mac-intel
-            os: macos-15-intel
-            platform: darwin
-            arch: x64
-            target: x86_64-apple-darwin
           - name: windows-x64
             os: windows-2022
             platform: win32

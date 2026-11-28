@@ -185,3 +185,11 @@ test('oversized bodies, malformed output and linked resources are rejected witho
     } finally { await f.close(); }
   }
 });
+
+test('GitHub header annotations retain normal required argument validation', () => {
+  const schema = {type:'object',properties:{repo:{type:'string','x-mcp-header':'repo'}},required:['repo']};
+  validateExternalSchema(schema);
+  assert.ok(matchesExternalSchema(schema, {repo:'athena'}));
+  assert.equal(matchesExternalSchema(schema, {}), false);
+  assert.throws(() => validateExternalSchema({type:'object','x-mcp-header':['other']}), /header annotation/);
+});

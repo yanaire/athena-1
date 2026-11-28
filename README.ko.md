@@ -203,7 +203,7 @@ npm test
 python3 athena-backend-handoff/athena-codex-ui/build.py
 ```
 
-[Verify Athena 워크플로우](.github/workflows/verify.yml)는 Gitleaks Git 이력 검사, 타입·UI 계약 검증, 호스트·통제 제공자 테스트, 운영 npm 의존성 및 선언 라이선스 감사, Apple Silicon 앱 빌드·검증을 수행합니다.
+[Verify Athena 워크플로우](.github/workflows/verify.yml)는 Gitleaks Git 이력 검사, 타입·UI 계약 검증, 호스트·통제 제공자 테스트, 운영 npm 의존성 및 선언 라이선스 감사, Apple Silicon 및 Windows x64 앱 빌드·설치 검증을 수행합니다. Intel Mac은 수동 소스 빌드를 사용할 수 있습니다.
 
 별도 실모델 인수 시험은 앞서 설정한 모델과 엔드포인트를 사용합니다.
 

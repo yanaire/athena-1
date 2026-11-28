@@ -9,7 +9,7 @@
   <p>Research with agents. Inspect their work. Keep the evidence.</p>
 
   <a href="https://github.com/yanaire/athena/actions/workflows/verify.yml"><img alt="Verify Athena" src="https://github.com/yanaire/athena/actions/workflows/verify.yml/badge.svg?branch=main"></a>
-  <img alt="Platform: macOS Apple Silicon and Intel" src="https://img.shields.io/badge/macOS-arm64%20%2F%20x64-555555?style=flat">
+  <img alt="Platform: macOS Apple Silicon" src="https://img.shields.io/badge/macOS-arm64-555555?style=flat">
   <img alt="Platform: Windows x64" src="https://img.shields.io/badge/Windows-x64-555555?style=flat">
   <img alt="Development stage: source preview" src="https://img.shields.io/badge/stage-source%20preview-B39A62?style=flat">
 
@@ -58,11 +58,11 @@ verification. ChatGPT-account acceptance is a separate test.
 | Desktop | Native macOS arm64/x64 and Windows x64 builds using Tauri and a bundled Node sidecar |
 | Execution visibility | Recorded Workflow DAG, task and agent history, and Artifacts views backed by actual host records |
 | Research records | Mission plans, exact input/result evidence, separately assigned reviewers, reusable observations and verified methods |
+| Manuscripts | In a research project, one chat request links a planned experiment and independently reviewed manuscript to a compiled LaTeX PDF. The side panel shows saved progress, draft sections and downloads. |
 | Extensions | Twelve version-pinned research skills and explicitly approved external MCP connections |
 
 **Remaining scope:** The runtime Browser, Device, Files and Diff panels do not yet
-provide their broader automation services. Full manuscript/PDF publishing,
-arbitrary executable plugins, scheduled research wake-ups and automatic retries
+provide their broader automation services. Journal submission, arbitrary executable plugins, scheduled research wake-ups and automatic retries
 remain outside the implemented scope. See the [UI capability audit](docs/ui-capability-audit.md)
 and [research workflow contract](docs/research-workflow.md).
 
@@ -77,7 +77,9 @@ account remains a separate, unfinished verification step.
 - **Settings → Tools & plugins:** import or update a JSON package, inspect its
   endpoints and allowed tools, check each MCP connection, then enable the package.
   Skills can be selected individually. Changes apply to new runs; existing runs
-  retain their admitted versions and credentials.
+  retain their admitted versions and credentials. In chat, type `$`, select a
+  project skill with Enter or Tab and send the request. See the
+  [CadQuery STEP experiment](examples/cad-spacer/) for a runnable program plugin.
 - **Workflow → Research board:** inspect the research plan, actual input/result
   evidence, independent reviewer receipts and reusable methods. Model review,
   independent reproduction and human-confirmed conventions remain distinct.
@@ -97,9 +99,9 @@ workflow inspired by Hyra 2.0, not an imported Hyra runtime.
 
 ### Workflow and desktop platforms
 
-The source includes the recorded Workflow DAG and reviewed chat fixes. Desktop
-builds support Apple Silicon and Intel on macOS 13.5 or later, and Windows x64
-with an NSIS installer. `npm run desktop:build` selects the native target. See
+The source includes the recorded Workflow DAG and reviewed chat fixes. CI verifies
+the Apple Silicon macOS app and the Windows x64 NSIS installer. Intel Macs retain
+a manual source-build target. `npm run desktop:build` selects the native target. See
 the [installation guide](docs/installation.md) and [Korean installation guide](docs/installation.ko.md)
 for prerequisites and explicit target commands.
 
@@ -127,6 +129,12 @@ flowchart TD
     M --> P
     P --> C1
     P --> C2
+    P -->|Fixed experiment contract| M
+    M --> Q["Mission planner<br/>Choose next trial or stop"]
+    Q --> R
+    Q -->|Proposal| M
+    M -->|Dispatch trial| C2
+    A -->|Measured value| M
     P --> R
     C1 --> R
     C2 --> R
@@ -135,10 +143,13 @@ flowchart TD
     P --> S
     W --> M
     M --> A
+    A --> V["Independent review of frozen evidence and manuscript"]
+    V --> L["Approved revision · local LaTeX compiler"]
+    L --> U
     A --> U
 ```
 
-The browser-development UI can also connect directly to the local Node host. TaskManager owns scheduling, file grants, run state and artifact publication; the official Pi SDK owns the independent parent/child model sessions and their JSONL histories. The model selection is fixed for a run and its children.
+The browser-development UI can also connect directly to the local Node host. TaskManager owns scheduling, file grants, run state and artifact publication; the official Pi SDK owns the independent parent/child model sessions and their JSONL histories. Settings → Models & connections can assign a saved model and reasoning level to each worker role. TaskManager freezes those choices with the coordinator's model for each run.
 
 | Layer | Technology |
 | :--- | :--- |
@@ -282,7 +293,7 @@ npm test
 python3 athena-backend-handoff/athena-codex-ui/build.py
 ```
 
-The [Verify Athena workflow](.github/workflows/verify.yml) runs `history-secrets`, `apple-silicon`, `browser-chat`, `desktop-mac-intel` and `desktop-windows-x64`. It runs the host suites on native runners, boots desktop apps installed from both Mac DMGs and the Windows NSIS installer, and exercises chat and workflow in Chromium with synthetic inputs. All five checks are required on `main`.
+The [Verify Athena workflow](.github/workflows/verify.yml) runs `history-secrets`, `apple-silicon`, `browser-chat` and `desktop-windows-x64`. It runs the native host suites, starts apps installed from the Apple Silicon DMG and Windows x64 NSIS installer, and exercises chat and workflow in Chromium with synthetic inputs. These four checks are required on `main`.
 
 For a separate live-model acceptance run, configure the endpoint and model above:
 

@@ -22,6 +22,8 @@
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.6.0",
     "@earendil-works/pi-ai": "1.6.0",
+    "@rgrove/parse-xml": "5.2.0",
+    "marked": "18.0.11",
     "typebox": "1.4.7"
   },
   "devDependencies": {

@@ -46,6 +46,7 @@
       listModelProfiles: () => rpc('listModelProfiles', []),
       saveModelProfile: input => rpc('saveModelProfile', [input]),
       deleteModelProfile: (id, revision) => rpc('deleteModelProfile', [id, revision]),
+      setWorkerModelPreference: input => rpc('setWorkerModelPreference',[input]),
       setAppModelProfile: id => rpc('setAppModelProfile', [id]),
       setProjectModelProfile: (projectId, id) => rpc('setProjectModelProfile', [projectId, id]),
       setConversationModelProfile: (sessionId, id) => rpc('setConversationModelProfile', [sessionId, id]),
@@ -58,6 +59,7 @@
     return Object.freeze({
       capability: 'extensions',
       getExtensions: projectId => rpc('getExtensions', [projectId]),
+      installGitHubPlugin: (projectId, revision) => rpc('installGitHubPlugin', [projectId, revision]),
       installPlugin: (projectId, manifest, revision) => rpc('installPlugin', [projectId, manifest, revision]),
       setPluginEnabled: (projectId, id, enabled, revision) => rpc('setPluginEnabled', [projectId, id, enabled, revision]),
       removePlugin: (projectId, id, revision) => rpc('removePlugin', [projectId, id, revision]),
@@ -193,8 +195,13 @@
         modelProfiles = modelProfilesAdapter();
         if (modelProfiles) app.attachModelProfiles?.(modelProfiles);
         app.attachWebAddressOpener?.(capabilities?.includes('system_web_links') ? address => rpc('openWebAddress', [address]) : null);
+        window.AthenaFolderPicker=capabilities.includes('project_folder_picker')?()=>rpc('chooseProjectFolder',[]):null;
         if(capabilities.includes('manuscripts')){
-          app.attachResearchService?.({documents:{getDocument:req=>rpc('getDocument',[req]),saveDocument:req=>rpc('saveDocument',[req])}});
+          app.attachResearchService?.({knowledge:{
+            listSources:input=>rpc('listLibrarySources',[input]),
+            searchAndSave:input=>rpc('searchAndSavePapers',[{...input,sessionId:snapshot.sessionId}]),
+            canSearch:project=>snapshot?.projectId===project&&snapshot.projects?.some(p=>p.id===project&&p.researchWorkflow)&&!!snapshot.sessionId
+          },documents:{getDocument:req=>rpc('getDocument',[req]),saveDocument:req=>rpc('saveDocument',[req])}});
           app.attachPaperService?.((method,request)=>rpc(method,[request]));
         }
         app.attachExtensions?.(extensionsAdapter());

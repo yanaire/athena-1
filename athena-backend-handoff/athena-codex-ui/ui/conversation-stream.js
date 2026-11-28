@@ -23,10 +23,15 @@
       }
     }
     function makeNode(entry) {
-      const article = document.createElement(entry.kind === 'tool' ? 'div' : 'article');
+      const article = document.createElement(entry.kind === 'handoff' ? 'details' : entry.kind === 'tool' ? 'div' : 'article');
       article.className = entry.kind === 'tool' ? 'ac-stream-tool' : 'ac-pi-history-message ac-stream-message';
       article.dataset.streamKey = entry.key;
-      if (entry.kind !== 'tool') {
+      if (entry.kind === 'handoff') {
+        article.className = 'ac-stream-handoff';
+        const label = document.createElement('summary'); label.className = 'cursor-interaction'; label.textContent = 'Manuscript instructions';
+        const body = document.createElement('p'); body.className = 'ac-stream-text';
+        article.append(label, body);
+      } else if (entry.kind !== 'tool') {
         article.dataset.role = entry.role;
         const label = document.createElement('strong'); label.textContent = entry.role === 'user' ? 'You' : 'Athena';
         const body = document.createElement('p'); body.className = 'ac-stream-text';
@@ -46,6 +51,50 @@
         return { ...tool, status, active: status === 'running', taskId: recorded.taskId, sessionId: recorded.sessionId };
       });
     }
+    const groups = new Map();
+    function arrange(parent, children) {
+      let cursor = parent.firstElementChild;
+      for (const node of children) {
+        if (node === cursor) cursor = cursor.nextElementSibling;
+        else parent.insertBefore(node, cursor);
+      }
+    }
+    function activityBlocks(ordered) {
+      const visible = [], kept = new Set();
+      let block = null;
+      for (const item of ordered) {
+        if (!item.activity && !['tool', 'handoff'].includes(item.entry.kind)) {
+          visible.push(item.node); block = null; continue;
+        }
+        const run = item.activity?.runId || item.entry?.athena?.runId || '';
+        if (!block || block.run !== run) {
+          const anchor = item.activity?.attemptId || item.activity?.key || item.entry?.toolId || item.entry?.athena?.attemptId || item.entry?.key;
+          const key = JSON.stringify([run, anchor]);
+          block = groups.get(key);
+          if (!block) {
+            const node = document.createElement('details'), summary = document.createElement('summary'), body = document.createElement('div');
+            node.className = 'ac-stream-activity'; summary.className = 'cursor-interaction';
+            body.className = 'ac-stream-steps'; node.append(summary, body);
+            block = { node, summary, body, run };
+            groups.set(key, block);
+          }
+          kept.add(key); visible.push(block.node);
+          block.children = []; block.statuses = [];
+        }
+        block.children.push(item.node);
+        block.statuses.push(item.activity ? item.node.querySelector('.aw-attempt-heading [data-status]')?.dataset.status : item.node.querySelector('[data-pi-status]')?.dataset.piStatus);
+      }
+      for (const [key, group] of groups) {
+        if (!kept.has(key)) { group.node.remove(); groups.delete(key); continue; }
+        arrange(group.body, group.children);
+        const state = group.statuses.includes('failed') ? 'Needs attention' : group.statuses.includes('blocked') ? 'Waiting for input'
+          : group.statuses.includes('running') ? 'Working' : group.statuses.some(s => ['stopped','cancelled'].includes(s)) ? 'Stopped' : '';
+        const count = group.children.length;
+        const label = ['Research activity', count + (count === 1 ? ' step' : ' steps'), state].filter(Boolean).join(' · ');
+        if (group.summary.textContent !== label) group.summary.textContent = label;
+      }
+      return visible;
+    }
     function layout() {
       if (destroyed) return;
       const arranged = entries.filter(entry => entry.kind === 'tool' || entry.text !== '' || entry.attachments?.length).map(entry => ({ entry, node: nodes.get(entry.key) })).filter(item => item.node);
@@ -62,11 +111,7 @@
         while (index < arranged.length && arranged[index].activity && arranged[index].activity.runId === item.runId && (arranged[index].activity.at ?? Infinity) <= (item.at ?? Infinity)) index++;
         arranged.splice(index, 0, { node: item.node, activity: item });
       }
-      let cursor = host.firstElementChild;
-      for (const item of arranged) {
-        if (item.node === cursor) cursor = cursor.nextElementSibling;
-        else host.insertBefore(item.node, cursor);
-      }
+      arrange(host, activityBlocks(arranged));
       host.hidden = !arranged.length && !error;
     }
     function withLayout(change) {
@@ -108,7 +153,10 @@
       generation++; entries = []; tools.clear(); pendingUser = null; liveOwner = null; liveKeys.clear(); lastObservedOrder = 0; error = null;
       for (const node of nodes.values()) node.remove();
       nodes.clear();
-      if (!keepActivities) { for (const item of activities.values()) item.node.remove(); activities.clear(); }
+      if (!keepActivities) {
+        for (const group of groups.values()) group.node.remove();
+        groups.clear();
+        for (const item of activities.values()) item.node.remove(); activities.clear(); }
       view.reset(); host.hidden = true;
     }
     function history(messages) {
@@ -119,6 +167,18 @@
       return withLayout(() => restoreHistory(messages));
     }
     function restoreHistory(messages) {
+      // The live feed and the durable transcript share host-owned call IDs.
+      // Keep a reader's place when a settled run replaces its streaming rows.
+      const expanded = new Map();
+      for (const entry of entries) {
+        if (entry.kind !== 'tool' || !entry.athena) continue;
+        const row = view.getToolElement(entry.toolId);
+        if (!row?.open) continue;
+        const diagnostic = row.querySelector('[data-aw-diagnostics]');
+        expanded.set(entry.toolId, { attempt: entry.athena.attemptId, diagnostic: diagnostic.open,
+          focused: document.activeElement === row.querySelector('summary') ? 'summary' :
+            document.activeElement === diagnostic.querySelector('summary') ? '[data-aw-diagnostics] > summary' : null });
+      }
       clear(true);
       for (const [index, message] of (messages || []).entries()) {
         const owner = context(message.athena), at = timestamp(message.timestamp);
@@ -129,7 +189,7 @@
         }
         if (!['user', 'assistant'].includes(message.role)) continue;
         if (message.role === 'user') {
-          entries.push({ key: 'history:' + index, kind: 'message', role: 'user', text: text(message.content), attachments: attachmentNames(message.attachments), athena: owner, at });
+          entries.push({ key: 'history:' + index, kind: owner && message.manuscriptHandoff === true ? 'handoff' : 'message', role: 'user', text: text(message.content), attachments: attachmentNames(message.attachments), athena: owner, at });
           continue;
         }
         const content = typeof message.content === 'string' ? [{ type: 'text', text: message.content }] : message.content || [];
@@ -142,6 +202,14 @@
         }
       }
       render();
+      for (const entry of entries) {
+        const saved = expanded.get(entry.toolId);
+        if (!saved || saved.attempt !== entry.athena?.attemptId) continue;
+        const row = view.getToolElement(entry.toolId);
+        row.open = true;
+        row.querySelector('[data-aw-diagnostics]').open = saved.diagnostic;
+        if (saved.focused) row.querySelector(saved.focused).focus({preventScroll:true});
+      }
     }
     function finish() { generation++; pendingUser = null; liveOwner = null; liveKeys.clear(); lastObservedOrder = 0; error = null; }
     function beginUser(value, attachments = []) {
@@ -156,8 +224,9 @@
         if (pendingUser && !pendingUser.athena) pendingUser.athena = owner;
       }
       if (event.type === 'message_start' && event.message?.role === 'user') {
-        if (!pendingUser || pendingUser.observed) {
-          pendingUser = { key: 'user:' + generation + ':' + (++userCounter), kind: 'message', role: 'user', text: '', athena: owner, at: null, order: lastObservedOrder + 0.5 };
+        const handoff = owner && event.message.manuscriptHandoff === true;
+        if (!pendingUser || pendingUser.observed || handoff) {
+          pendingUser = { key: 'user:' + generation + ':' + (++userCounter), kind: handoff ? 'handoff' : 'message', role: 'user', text: '', athena: owner, at: null, order: lastObservedOrder + 0.5 };
           entries.push(pendingUser); liveKeys.add(pendingUser.key);
         }
         pendingUser.observed = true;

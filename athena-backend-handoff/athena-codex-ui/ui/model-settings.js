@@ -135,7 +135,7 @@
           ${field('endpoint', 'Endpoint base URL', 'url', 'Credentials and query parameters are not stored in endpoint URLs.', 'autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="2048" placeholder="http://localhost:11434/v1" required')}
           ${field('defaultModel', 'App default model', 'text', 'Used for new conversations unless the project or conversation selects another model.', 'autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="160" placeholder="your-model-id" required')}
         </section>
-        <section class="ams-section" data-ams-execution-section aria-labelledby="${prefix}routing-title">
+        <section class="ams-section" data-ams-execution-section data-legacy-role-routing aria-labelledby="${prefix}routing-title">
           <div class="ams-section-title"><h3 id="${prefix}routing-title">Role routing</h3><span>02</span></div>
           <p class="ams-section-copy">Leave a role blank to inherit the default model.</p>
           <div class="ams-routes">

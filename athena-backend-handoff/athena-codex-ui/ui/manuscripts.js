@@ -134,7 +134,7 @@ window.AthenaManuscripts = {mount(root, options) {
     } catch(error){if(epoch===generation)notice(error);}
     finally{button.disabled=false;if(epoch===generation&&selected)details().catch(notice);}
   },listeners);
-  return {attach(value){service=value;reset();},refresh,reload(version){details(version).catch(notice);},scope(s){
+  return {async select(id){await refresh();await choose(id);},attach(value){service=value;reset();},refresh,reload(version){details(version).catch(notice);},scope(s){
     snapshot=s;
     if(project!==s.projectId||session!==s.sessionId){project=s.projectId;session=s.sessionId;reset();}
     const items=(snapshot.artifacts||[]).filter(a=>a.status==='ready').map(a=>[a.id,a.title]);

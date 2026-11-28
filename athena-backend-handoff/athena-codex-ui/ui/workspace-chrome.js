@@ -66,7 +66,7 @@
       if (element.matches?.('[data-aw-diagnostics] > summary')) return { attribute: 'data-aw-diagnostics', value: element.parentElement.dataset.awDiagnostics, summary: true };
       if (element.dataset?.awToolAction) return { attribute: 'data-aw-tool-action', value: element.dataset.awToolAction, tool: element.dataset.awTool };
       if (element.dataset?.awOutputMode) return { attribute: 'data-aw-output-mode', value: element.dataset.awOutputMode, tool: element.dataset.awTool };
-      for (const attribute of ['id', 'data-aw-copy-fallback', 'data-aw-agent-reveal', 'data-aw-approval-open', 'data-aw-summary', 'data-aw-tool-summary', 'data-aw-process-summary', 'data-aw-thinking-summary', 'data-aw-action', 'data-aw-retry', 'data-aw-task-details', 'data-awv-focus', 'data-awv-action']) {
+      for (const attribute of ['id', 'data-aw-copy-fallback', 'data-aw-agent-reveal', 'data-aw-approval-open', 'data-aw-attempt-summary', 'data-aw-tool-summary', 'data-aw-summary', 'data-aw-process-summary', 'data-aw-thinking-summary', 'data-aw-action', 'data-aw-retry', 'data-aw-task-details', 'data-awv-focus', 'data-awv-action']) {
         const value = element.getAttribute?.(attribute);
         if (value != null) return { attribute, value };
       }
@@ -137,10 +137,9 @@
     function toolEventHTML(tool, state, agent = null) {
       const task = state.tasks.find(item => item.id === tool.taskId) || (state.mode === 'runtime' ? { id: null, title: 'Session tool', status: tool.status } : null);
       if (!task) return '';
-      const latest = tool.logs[tool.logs.length - 1];
-      const open = expandedTools.has(tool.id) || (agent && expanded.has(agent.id));
+      const open = expandedTools.has(tool.id);
       const identity = agent ? 'data-aw-agent="' + esc(agent.id) + '"' : 'data-aw-pending-tool="' + esc(tool.id) + '"';
-      const summaryKey = agent ? 'data-aw-summary="' + esc(agent.id) + '"' : 'data-aw-tool-summary="' + esc(tool.id) + '"';
+      const summaryKey = 'data-aw-tool-summary="' + esc(tool.id) + '"' + (agent ? ' data-aw-summary="' + esc(agent.id) + '"' : '');
       // A retry changes the task's current attempt, not the recorded tool outcome.
       // A successful worker process can still be followed by a failed tool wrapper.
       const activityStatus = state.mode === 'runtime' ? tool.status : task.status;
@@ -148,8 +147,10 @@
       const glyph = window.AthenaPiActivity.iconHTML(presentation.icon, { active: presentation.active });
       const owner = agent ? labels.agent(agent, state.tasks) : '';
       const status = LABELS[activityStatus] || displayText(activityStatus, 'Working', state);
-      const summary = latest && displayText(latest.text, [owner, status].filter(Boolean).join(' · '), state);
-      return '<details class="aw-agent-event" ' + identity + ' data-aw-event-tool="' + esc(tool.id) + '" data-pi-tool="' + esc(tool.sdkToolName || 'custom') + '"' + (open ? ' open' : '') + '><summary class="cursor-interaction" ' + summaryKey + '>' + glyph + '<span class="aw-agent-copy"><span class="aw-agent-name">' + esc(presentation.label) + '<span class="aw-agent-owner">' + (owner ? ' · ' + esc(owner) : '') + '</span><span class="aw-status" data-status="' + esc(activityStatus) + '">' + esc(status) + '</span></span><span class="aw-tool-target">' + esc(presentation.detail) + '</span>' + (latest ? '<span class="aw-tool-activity" data-aw-progress="' + esc(tool.id) + '">' + esc(summary) + '</span>' : '') + '</span>' + icon('chevron-down') + '</summary>' + toolDetailsHTML(tool, task, state) + '</details>';
+      return '<details class="aw-agent-event" ' + identity + ' data-aw-event-tool="' + esc(tool.id) + '" data-pi-tool="' + esc(tool.sdkToolName || 'custom') + '"' + (open ? ' open' : '') + '><summary class="cursor-interaction" ' + summaryKey + '>' + glyph
+        + '<span class="aw-agent-copy"><span class="aw-agent-name">' + esc(presentation.label) + '</span><span class="aw-tool-target">' + esc(presentation.detail) + '</span></span>'
+        + '<span class="aw-status" data-status="' + esc(activityStatus) + '">' + esc(status) + '</span>' + icon('chevron-down') + '</summary>'
+        + (owner ? '<p class="aw-attempt-meta">' + esc(owner) + '</p>' : '') + toolDetailsHTML(tool, task, state) + '</details>';
     }
 
     function agentGroupHTML(state) {
@@ -183,6 +184,10 @@
         expandedProcesses.add(process.id); thinkingOpen = true; renderSignature = ''; render(snapshot);
         const row = [...all('[data-aw-process]')].find(item => item.dataset.awProcess === process.id);
         if (!row) return false;
+        const attempt = row.closest('[data-aw-attempt]');
+        if (attempt) attempt.open = true;
+        const group = row?.closest('.ac-stream-activity');
+        if (group) group.open = true;
         row.open = true;
         row.querySelector('summary').focus({ preventScroll: true });
         row.scrollIntoView?.({ block: 'nearest' });
@@ -196,6 +201,10 @@
       if (agent) expanded.add(agent.id);
       renderSignature = ''; render(snapshot);
       const row = Array.from(all('[data-aw-event-tool]')).find(item => item.dataset.awEventTool === tool.id);
+      const attempt = row?.closest('[data-aw-attempt]');
+      if (attempt) attempt.open = true;
+      const group = row?.closest('.ac-stream-activity');
+      if (group) group.open = true;
       const summary = row?.querySelector('summary');
       if (focusable(summary)) { summary.focus({ preventScroll: true }); summary.scrollIntoView?.({ block: 'nearest', behavior: 'auto' }); }
       return true;
@@ -266,7 +275,7 @@
         const results = state.artifacts.filter(item => item.attemptId === attempt.id);
         const agent = state.agents.find(item => item.taskId === task.id);
         let node = attemptSections.get(attempt.id);
-        if (!node) { node = document.createElement('section'); node.className = 'aw-attempt'; node.dataset.awAttempt = attempt.id; attemptSections.set(attempt.id, node); }
+        if (!node) { node = document.createElement('details'); node.className = 'aw-attempt'; node.dataset.awAttempt = attempt.id; attemptSections.set(attempt.id, node); }
         kept.add(attempt.id);
         const ownStatus = LABELS[attempt.status] || displayText(attempt.status, 'Waiting', state);
         const attemptLabel = labels.attempt(attempt.id, { ...task, attempts: attempts.filter(item => item.taskId === task.id) });
@@ -275,7 +284,7 @@
         const observed = [...tools.map((tool, index) => ({ at: state.events.find(event => event.toolId === tool.id)?.at ?? tool.logs?.[0]?.at ?? Infinity, index, html: toolEventHTML(tool, state, agent) })), ...processes.map((process, index) => ({ at: process.job?.startedAt ?? state.events.find(event => event.processId === process.id)?.at ?? Infinity, index: tools.length + index, html: processHTML(process) }))].sort((a, b) => a.at - b.at || a.index - b.index);
         const summary = attempt.result ? displayText(attempt.result, '', state) : '';
         const resultButtons = results.map(item => '<button type="button" class="aw-text-button cursor-interaction" data-aw-artifact="' + esc(item.id) + '" data-aw-artifact-version="' + esc(item.version || '') + '">' + icon('file-check') + esc(displayText(item.title || item.file?.name, 'View result', state)) + '</button>').join('');
-        node.innerHTML = '<header class="aw-attempt-heading"><strong>' + esc(labels.task(task, state.tasks)) + '</strong><span class="aw-status" data-status="' + esc(attempt.status) + '">' + esc(ownStatus) + '</span></header>'
+        node.innerHTML = '<summary class="aw-attempt-heading cursor-interaction" data-aw-attempt-summary="' + esc(attempt.id) + '">' + icon('users-round') + '<strong>' + esc(labels.task(task, state.tasks)) + '</strong><span class="aw-status" data-status="' + esc(attempt.status) + '">' + esc(ownStatus) + '</span>' + icon('chevron-down') + '</summary>'
           + '<p class="aw-attempt-meta">' + esc([agent ? labels.agent(agent, state.tasks) : 'Subagent', attemptLabel].join(' · ')) + '</p>'
           + '<div class="aw-agent-events">' + observed.map(item => item.html).join('') + '</div>'
           + (summary && summary.length <= 300 ? '<p class="aw-attempt-result">' + esc(summary) + '</p>' : '')

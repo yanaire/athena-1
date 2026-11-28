@@ -7,6 +7,7 @@ import type { ModelCheck, ModelProfile, ResolvedModelReference } from '../athena
 import { object } from './connections.ts';
 import { ManagerError } from './orchestration.ts';
 import type { CompatibleProvider } from './provider-manager.ts';
+import { workerRoles, type WorkerRole, type RoleModels } from './worker-roles.ts';
 import { CHATGPT_RESOURCE } from './chatgpt-catalog.ts';
 
 type CatalogLookup = (provider: string, model: string) => Model<Api> | undefined;
@@ -36,6 +37,9 @@ export class ModelProfiles {
     this.#db.exec(`PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS model_profiles (
       id TEXT PRIMARY KEY, revision INTEGER NOT NULL, body TEXT NOT NULL
+    ) STRICT;
+    CREATE TABLE IF NOT EXISTS worker_model_preferences (
+      role TEXT PRIMARY KEY, profile TEXT NOT NULL REFERENCES model_profiles(id), thinking TEXT
     ) STRICT;
     CREATE TABLE IF NOT EXISTS model_profile_default (
       singleton INTEGER PRIMARY KEY CHECK(singleton=1), id TEXT REFERENCES model_profiles(id)
@@ -94,18 +98,54 @@ export class ModelProfiles {
     }
     const model = mode === 'chatgpt' ? chatGPT?.model : this.#lookup(provider, modelId);
     if (!model) throw new ManagerError('MODEL_UNAVAILABLE', 'This model is not in the selected provider catalog.');
-    const thinkingLevel = getSupportedThinkingLevels(model).find(level => level === (input.thinkingLevel ?? 'off'));
+    const supportedLevels = getSupportedThinkingLevels(model);
+    const thinkingLevel = supportedLevels.find(level => level === (input.thinkingLevel ?? 'off'));
     if (thinkingLevel === undefined) throw new ManagerError('MODEL_UNAVAILABLE', 'The model does not support the requested reasoning level.');
     const endpoint = mode === 'chatgpt' ? CHATGPT_RESOURCE : this.#endpoint(provider);
+    if (old && this.workerPreferences().some(role => role.profileId === id && role.thinkingLevel !== null &&
+      !supportedLevels.some(level => level === role.thinkingLevel))) {
+      throw new ManagerError('PROFILE_IN_USE', 'Update the assigned worker reasoning levels before changing this profile to that model.');
+    }
     const profile: ModelProfile = { id, name, provider, modelId, thinkingLevel,
-      revision: (old?.revision ?? 0) + 1, authRef: chatGPT?.authRef ?? provider,
+      supportedLevels, revision: (old?.revision ?? 0) + 1, authRef: chatGPT?.authRef ?? provider,
       ...(mode === 'chatgpt' ? { authMode: mode } : {}), ...(endpoint ? { endpoint } : {}) };
     this.#db.prepare(`INSERT INTO model_profiles VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,body=excluded.body`)
       .run(id, profile.revision, JSON.stringify(profile));
     return profile;
   }
 
+  supportedLevels(profile:ModelProfile){
+    const model=profile.authMode==='chatgpt'?undefined:this.#lookup(profile.provider,profile.modelId);
+    return model?getSupportedThinkingLevels(model):profile.supportedLevels??[profile.thinkingLevel];
+  }
+  workerPreferences(){
+    return Object.entries(workerRoles).map(([role,label])=>{
+      const row=this.#db.prepare('SELECT profile,thinking FROM worker_model_preferences WHERE role=?').get(role);
+      return {role,label,profileId:row?String(row.profile):null,thinkingLevel:row?.thinking==null?null:String(row.thinking)};
+    });
+  }
+  setWorkerPreference(role:string,profileId:string|null,level:string|null){
+    if(!Object.hasOwn(workerRoles,role))throw new ManagerError('INVALID_ROLE','Unknown worker role.');
+    if(profileId===null){
+      if(level!==null)throw new ManagerError('INVALID_ROLE','Select a profile before setting a reasoning level.');
+      this.#db.prepare('DELETE FROM worker_model_preferences WHERE role=?').run(role);
+    }else{
+      const profile=this.get(profileId);
+      if(level!==null&&!this.supportedLevels(profile).some(value=>value===level))throw new ManagerError('MODEL_UNAVAILABLE','This profile does not support that reasoning level.');
+      this.#db.prepare('INSERT INTO worker_model_preferences VALUES(?,?,?) ON CONFLICT(role) DO UPDATE SET profile=excluded.profile, thinking=excluded.thinking').run(role,profileId,level);
+    }
+  }
+  roleModels():RoleModels{
+    const models:RoleModels={};
+    for(const pref of this.workerPreferences())if(pref.profileId){
+      const selected=this.resolve(pref.profileId,null)!;
+      models[pref.role as WorkerRole]={...selected,source:'role',thinkingLevel:pref.thinkingLevel??selected.thinkingLevel};
+    }
+    return models;
+  }
+
   remove(id: string, revision: unknown): void {
+    if(this.#db.prepare('SELECT 1 FROM worker_model_preferences WHERE profile=?').get(id))throw new ManagerError('PROFILE_IN_USE','Clear worker role selections before deleting this profile.');
     const profile = this.get(id);
     if (profile.revision !== revision) throw new ManagerError('PROFILE_CONFLICT', 'The profile changed. Reload it before deleting.');
     if (this.appDefaultProfileId === id) throw new ManagerError('PROFILE_IN_USE', 'Clear the app default before deleting this profile.');

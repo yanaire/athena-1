@@ -117,6 +117,10 @@
           <button class="ac-button cursor-interaction" data-open="manuscript"><i data-lucide="file-pen-line" aria-hidden="true"></i>View linked manuscript</button>
         </section>
         <section class="ac-panel-body" id="ac-view-manuscript" role="tabpanel" aria-labelledby="ac-tab-manuscript" hidden>
+          <section id="ac-research-flow" class="ac-paper-project" hidden aria-label="Research workflow">
+            <div><button data-flow-tab="progress" aria-pressed="true">Research progress</button><button data-flow-tab="preview" aria-pressed="false">Manuscript preview</button></div>
+            <div data-flow-body></div><p data-flow-notice role="status"></p>
+          </section>
           <section id="ac-paper-project" class="ac-paper-project" aria-label="Manuscript workspace" hidden>
             <h2>Manuscripts</h2><label>Project manuscripts<select data-paper="documents"></select></label>
             <details><summary>New manuscript and sources</summary>

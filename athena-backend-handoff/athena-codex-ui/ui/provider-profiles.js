@@ -86,8 +86,13 @@
         <p class="ams-section-copy" role="status" data-amp-migration-status hidden></p>
         <button type="button" class="ams-btn cursor-interaction" data-amp-import-credentials hidden>Approve import from Keychain</button>
 
+        <section class="amp-section" data-amp-routing hidden aria-labelledby="amp-routing-title">
+          <h3 id="amp-routing-title">Worker models</h3>
+          <p class="ams-section-copy">Choose a saved profile and reasoning level for each role. Changes apply to the next research request.</p>
+          <div data-amp-roles></div>
+        </section>
         <section class="amp-section" aria-labelledby="amp-providers-title">
-          <div class="ams-section-title"><h3 id="amp-providers-title">Provider credentials</h3><span>01</span></div>
+          <div class="ams-section-title"><h3 id="amp-providers-title">Provider credentials</h3></div>
           <p class="ams-section-copy">Search the providers registered by the installed Pi SDK. Sign-in methods come from the SDK and Athena's provider policy.</p>
           <label class="amp-search">${icon('search')}<input type="search" data-amp-provider-search placeholder="Search providers" aria-label="Search providers" autocomplete="off" spellcheck="false"></label>
           <div class="amp-list" role="list" data-amp-providers></div>
@@ -106,7 +111,7 @@
         </section>
 
         <section class="amp-section" aria-labelledby="amp-catalog-title">
-          <div class="ams-section-title"><h3 id="amp-catalog-title">Model catalog</h3><span>02</span></div>
+          <div class="ams-section-title"><h3 id="amp-catalog-title">Model catalog</h3></div>
           <p class="ams-section-copy">The catalog lists models registered in the SDK. Eligibility marks the models your credentials can select. Only an explicit profile verification probes a live inference.</p>
           <div class="amp-catalog-bar">
             <select class="ams-input cursor-interaction" data-amp-catalog-provider aria-label="Catalog provider"></select>
@@ -127,7 +132,7 @@
         </section>
 
         <section class="amp-section" aria-labelledby="amp-profiles-title">
-          <div class="ams-section-title"><h3 id="amp-profiles-title">Saved model profiles</h3><span>03</span></div>
+          <div class="ams-section-title"><h3 id="amp-profiles-title">Saved model profiles</h3></div>
           <p class="amp-section-copy" data-amp-profiles-intro></p>
           <div class="amp-list" role="list" data-amp-profiles></div>
           <p class="amp-error" role="alert" data-amp-profiles-error hidden></p>
@@ -152,6 +157,10 @@
       </div>`;
     const root = slot.querySelector('.amp-root');
     const q = selector => root.querySelector(selector);
+    const routingPanel = q('[data-amp-routing]');
+    const roleList = q('[data-amp-roles]');
+    const routingSlot = slot.closest('[role="tabpanel"]')?.querySelector('#ast-worker-models-slot');
+    routingSlot?.appendChild(routingPanel);
     const listNode = key => q('[data-amp-' + key + ']');
 
     const workspace = () => options.getWorkspace?.() || {};
@@ -336,7 +345,7 @@
     async function loadList() {
       await call('list', () => adapter.listModelProfiles(), result => {
         list = {
-          profiles: rows(result?.profiles),
+          profiles: rows(result?.profiles), workerRoles:rows(result?.workerRoles),
           appDefaultProfileId: idOf(result?.appDefaultProfileId),
           credentialMode: idOf(result?.credentialMode),
           credentialMigration: idOf(result?.credentialMigration),
@@ -640,6 +649,34 @@
         <button type="button" class="ams-button cursor-interaction amp-danger" data-amp-action="delete" data-amp-profile-id="${escapeHTML(profile.id)}">${icon('trash-2')}Delete</button>
       </div>`;
     }
+    let roleSignature='';
+    function renderWorkerRoles(){
+      const panel=routingPanel,roles=rows(list.workerRoles);
+      panel.hidden=!adapter?.setWorkerModelPreference||!roles.length;
+      slot.closest('.ast-content')?.classList.toggle('amp-live-roles',!panel.hidden);
+      if(panel.hidden)return;
+      const inherited=profileById(currentSession()?.profileId) || profileById(currentProject()?.defaultProfileId) || profileById(list.appDefaultProfileId) || list.hostModel;
+      const signature=JSON.stringify([roles,inherited,list.profiles.map(p=>[p.id,p.name,p.modelId,p.thinkingLevel,p.supportedLevels]),at('worker-role')]);
+      if(roleSignature===signature)return;
+      roleSignature=signature;
+      const option=(value,label,selected)=>'<option value="'+escapeHTML(value)+'"'+(selected?' selected':'')+'>'+escapeHTML(label)+'</option>';
+      roleList.innerHTML=roles.map(r=>{
+        const profile=list.profiles.find(p=>p.id===r.profileId),disabled=at('worker-role')?' disabled':'';
+        const models=option('',inherited?.modelId?'Inherit · '+inherited.modelId:'Inherit conversation',!profile)+list.profiles.map(p=>option(p.id,p.name+' · '+p.modelId,p.id===r.profileId)).join('');
+        const levels=profile?(option('','Profile · '+profile.thinkingLevel,r.thinkingLevel===null)+(profile.supportedLevels||[profile.thinkingLevel]).map(l=>option(l,LEVEL_LABELS[l]||l,r.thinkingLevel===l)).join('')):option('',inherited?.thinkingLevel?'Inherit · '+inherited.thinkingLevel:'Inherit conversation',true);
+        return '<div class="amp-worker-row"><strong>'+escapeHTML(r.label)+'</strong><select class="ams-input" data-role-profile="'+escapeHTML(r.role)+'" aria-label="'+escapeHTML(r.label)+' model"'+disabled+'>'+models+'</select><select class="ams-input" data-role-level="'+escapeHTML(r.role)+'" aria-label="'+escapeHTML(r.label)+' reasoning"'+(!profile||disabled?' disabled':'')+'>'+levels+'</select></div>';
+      }).join('');
+    }
+    listen(roleList,'change',event=>{
+      const control=event.target,role=control.dataset.roleProfile||control.dataset.roleLevel;
+      const row=list.workerRoles?.find(r=>r.role===role);
+      if(!row||!adapter?.setWorkerModelPreference)return;
+      const profileId=control.dataset.roleProfile?control.value||null:row.profileId;
+      const thinkingLevel=control.dataset.roleLevel?control.value||null:null;
+      void call('worker-role',()=>adapter.setWorkerModelPreference({role,profileId,thinkingLevel}),result=>{
+        list.workerRoles=rows(result.workerRoles);
+      });
+    });
     function renderProfiles() {
       const intro = q('[data-amp-profiles-intro]');
       const hostModel = list.hostModel;
@@ -766,6 +803,7 @@
       if (destroyed) return;
       root.hidden = !adapter;
       root.dataset.ampMounted = String(Boolean(adapter));
+      renderWorkerRoles();
       if (!adapter) return;
       renderProviders();
       renderCatalog();
@@ -901,11 +939,15 @@
           const profile = profileById(profileId);
           return profile ? { name: profile.name, provider: profile.provider, modelId: profile.modelId, thinkingLevel: profile.thinkingLevel } : null;
         };
-        const runModel = snapshot?.run?.model;
+        const runModel = snapshot?.run?.id && snapshot.run.model;
+        const app = label(list.appDefaultProfileId) || list.hostModel || null;
+        const projectProfile = project?.defaultProfileId ? label(project.defaultProfileId) : null;
+        const effective = projectProfile || project?.defaultModel || app;
+        const inherited = value => value ? 'Inherit · '+(value.name || value.modelId || value.id) : null;
         return {
-          appDefault: label(list.appDefaultProfileId) || list.hostModel || null,
-          projectDefault: project && idOf(project.defaultProfileId) ? label(project.defaultProfileId) || 'Profile ' + project.defaultProfileId : null,
-          conversation: session && idOf(session.profileId) ? label(session.profileId) || 'Profile ' + session.profileId : null,
+          appDefault: app,
+          projectDefault: project && idOf(project.defaultProfileId) ? projectProfile || 'Profile ' + project.defaultProfileId : project ? inherited(app) : null,
+          conversation: session && idOf(session.profileId) ? label(session.profileId) || 'Profile ' + session.profileId : session ? inherited(effective) || 'Inherit project default' : null,
           runLocked: runModel ? { name: runModel.name || runModel.modelId || runModel.id, provider: runModel.provider, modelId: runModel.modelId || runModel.id, thinkingLevel: runModel.thinkingLevel } : null
         };
       },
@@ -918,6 +960,7 @@
         destroyed = true; generation++; owners.clear();
         clearTimeout(flowTimer); clearTimeout(providerSearchTimer);
         controller.abort();
+        routingPanel.remove();
         root.remove();
       }
     };

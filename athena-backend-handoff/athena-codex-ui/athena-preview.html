@@ -40,6 +40,11 @@ if(window.AthenaHosted===true||(/^https?:$/.test(location.protocol)&&location.pa
 .ac-inline-agent>svg{width:16px;height:16px;color:#a4a9a4;flex:none}
 @media(max-width:640px){.ac-inline-agent{gap:8px;padding:11px}.ac-inline-agent-title{flex-wrap:wrap}.ac-inline-status{margin-left:0}}
 
+#athena-codex .ac-dialog .ac-research-choice{display:flex;align-items:center;gap:.65rem;margin:.8rem 0}
+#athena-codex .ac-dialog .ac-research-choice input[type=checkbox]{width:1rem;height:1rem;margin:0;padding:0;flex:none}
+#athena-codex .ac-live-manuscript:not([hidden]){display:block;padding:.65rem 1rem;border-bottom:1px solid var(--line,#ddd)}
+#athena-codex .ac-live-manuscript pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:15rem;overflow:auto;font:inherit;line-height:1.5;margin:.4rem 0 0}
+
 /* Athena composer. Motion references are recorded in composer.js.
    All selectors and tokens stay inside the application root. */
 #athena-codex .acm-composer {
@@ -824,10 +829,11 @@ if(window.AthenaHosted===true||(/^https?:$/.test(location.protocol)&&location.pa
 #athena-codex .aw-agent-event > summary > svg {width:14px;height:14px;flex:none;margin-top:3px;}
 #athena-codex .aw-agent-event > summary > svg:last-child {width:11px;height:11px;margin-top:5px;transition:transform .15s ease;transform:rotate(-90deg);color:var(--aw-activity-muted);}
 #athena-codex .aw-agent-event[open] > summary > svg:last-child {transform:rotate(0);}
-#athena-codex .aw-agent-copy {flex:1;min-width:0;font-size:12px;line-height:1.8;}
-#athena-codex .aw-agent-name {display:block;overflow-wrap:anywhere;}
+#athena-codex .aw-agent-copy {flex:1;display:flex;gap:8px;align-items:baseline;min-width:0;font-size:12px;line-height:1.8;}
+#athena-codex .aw-agent-name, #athena-codex .aw-tool-target {overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+#athena-codex .aw-agent-name {flex-shrink:0;max-width:100%;}
 #athena-codex .aw-agent-owner {color:var(--aw-activity-muted);}
-#athena-codex .aw-tool-activity {display:block;margin-top:3px;color:var(--aw-activity-muted);font-size:11px;line-height:1.8;overflow-wrap:anywhere;}
+
 #athena-codex .aw-agent-detail {min-width:0;padding:4px 0 15px 23px;color:var(--aw-activity-text);}
 #athena-codex .aw-activity .aw-tool-task {margin:0 0 8px;font-size:11px;line-height:1.7;}
 #athena-codex .aw-tool-context {display:flex;flex-wrap:wrap;gap:4px 18px;margin:0 0 7px;font-size:11px;line-height:1.7;}
@@ -906,14 +912,14 @@ if(window.AthenaHosted===true||(/^https?:$/.test(location.protocol)&&location.pa
 
 #athena-codex .ar-activity-slot {min-width:0;margin:7px 0 16px;}
 #athena-codex .ap-tool-event {min-width:0;margin:5px 0;color:rgba(48,52,46,.70);}
-#athena-codex .ap-tool-event > summary {display:flex;align-items:flex-start;gap:9px;list-style:none;padding:7px 0;min-width:0;}
+#athena-codex .ap-tool-event > summary {display:flex;align-items:center;gap:9px;list-style:none;padding:7px 0;min-width:0;}
 #athena-codex .ap-tool-event > summary::-webkit-details-marker {display:none;}
 #athena-codex .ap-tool-event > summary > svg {width:11px;height:11px;margin-top:5px;transform:rotate(-90deg);transition:transform .15s ease;flex:none;}
 #athena-codex .ap-tool-event[open] > summary > svg {transform:rotate(0);}
 #athena-codex .ap-tool-icon {display:inline-flex;flex:none;margin-top:1px;}
-#athena-codex .ap-tool-copy {flex:1;min-width:0;font-size:12px;line-height:1.8;}
-#athena-codex .ap-tool-label {display:block;}
-#athena-codex .ap-tool-target {display:block;white-space:pre-wrap;overflow-wrap:anywhere;color:rgba(48,52,46,.60);font-size:11px;line-height:1.7;}
+#athena-codex .ap-tool-copy {flex:1;display:flex;align-items:baseline;gap:8px;min-width:0;font-size:12px;line-height:1.8;}
+#athena-codex .ap-tool-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;max-width:100%;}
+#athena-codex .ap-tool-target {display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgba(48,52,46,.60);font-size:11px;line-height:1.7;}
 #athena-codex .ap-tool-body {min-width:0;padding:4px 0 13px 26px;font-size:11px;line-height:1.8;}
 #athena-codex .ap-tool-body dl {display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 8px;}
 #athena-codex .ap-tool-body dl > div {display:flex;gap:7px;min-width:0;}
@@ -926,7 +932,7 @@ if(window.AthenaHosted===true||(/^https?:$/.test(location.protocol)&&location.pa
 #athena-codex .ap-copy-label {display:block;margin-top:8px;}
 #athena-codex .ap-copy-label textarea {display:block;width:100%;min-height:80px;resize:vertical;background:#fafbf6;border:1px solid #d6d8cd;border-radius:5px;padding:8px;font:11px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;}
 #athena-codex .ap-session-error {font-size:12px;line-height:1.8;color:#955c48;overflow-wrap:anywhere;}
-#athena-codex .aw-tool-target {display:block;font-size:11px;line-height:1.7;color:rgba(48,52,46,.60);white-space:pre-wrap;overflow-wrap:anywhere;}
+#athena-codex .aw-tool-target {min-width:0;font-size:11px;color:var(--ac-muted);}
 #athena-codex .aw-agent-event > summary > .ap-icon {margin-top:2px;}
 @media(pointer:coarse){#athena-codex .ap-tool-event > summary,#athena-codex .ap-tool-actions button {min-height:44px;}#athena-codex .ap-copy-label textarea {font-size:16px;}}
 @media(prefers-reduced-motion:reduce){#athena-codex .ap-tool-event > summary > svg {transition:none;}}
@@ -1375,6 +1381,13 @@ if(window.AthenaHosted===true||(/^https?:$/.test(location.protocol)&&location.pa
 #athena-codex .amp-profile-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 #athena-codex .amp-profile-form .amp-actions { margin-top: 12px; }
 #athena-codex .amp-root[data-busy="true"] .amp-profile-actions .ams-button[disabled], #athena-codex .amp-root[data-busy="true"] [data-amp-profile-save][disabled] { opacity: .6; }
+
+#athena-codex .amp-live-roles [data-legacy-role-routing]{display:none}
+#athena-codex .amp-worker-row{display:grid;grid-template-columns:minmax(105px,1fr) minmax(135px,1.4fr) minmax(100px,1fr);align-items:center;gap:8px;margin:8px 0}
+#athena-codex .amp-worker-row select{width:100%;min-width:0}
+@media(max-width:600px){#athena-codex .amp-worker-row{grid-template-columns:1fr 1fr}.amp-worker-row strong{grid-column:1/-1}}
+
+#athena-codex #ast-worker-models-slot:not(:empty) > section:not([hidden]) { margin: 0 0 22px; }
 
 /* Project knowledge panel. Sized for a 300 px side slot without horizontal overflow. */
 #athena-codex .akn-root { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; overflow: hidden; background: #fffefa; color: #43493a; font-size: 12px; line-height: 1.6; }
@@ -2557,14 +2570,29 @@ html[data-athena-hosted="true"] #athena-codex:not([data-workspace-mode]) #ac-pi-
 #athena-codex .ac-stream-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 #athena-codex .ac-stream-tool { margin: -5px 0; }
 #athena-codex .ac-stream-tool .ap-tool-event { margin: 0; }
-#athena-codex .aw-attempt { border-left: 2px solid var(--ac-line); padding-left: 15px; margin: 2px 0 8px; }
-#athena-codex .aw-attempt-heading { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 0 0 5px; color: var(--ac-text); font-size: 14px; }
-#athena-codex .aw-attempt-heading strong { font-weight: 550; }
+#athena-codex .aw-attempt { min-width: 0; margin: -5px 0; }
+#athena-codex .aw-attempt-heading { display: flex; align-items: center; gap: 9px; list-style: none; padding: 7px 0; color: var(--ac-muted); font-size: 13px; line-height: 1.6; }
+#athena-codex .aw-attempt-heading::-webkit-details-marker { display: none; }
+#athena-codex .aw-attempt-heading strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+#athena-codex .aw-attempt-heading > svg { flex: none; width: 15px; height: 15px; }
+#athena-codex .aw-attempt-heading > svg:last-child { width: 11px; transform: rotate(-90deg); }
+#athena-codex .aw-attempt[open] > summary > svg:last-child { transform: none; }
+#athena-codex .aw-attempt > :not(summary) { margin-left: 24px; }
+@media(pointer:coarse) { #athena-codex .aw-attempt-heading { min-height: 44px; } }
 #athena-codex .aw-attempt-meta { margin: 0 0 8px; color: var(--ac-muted); font-size: 12px; }
 #athena-codex .aw-attempt .aw-agent-events { margin: 0; }
 #athena-codex .aw-attempt .aw-approval-inline { margin-top: 10px; }
 #athena-codex .aw-attempt-results { margin-top: 8px; }
 #athena-codex .aw-attempt-results:empty { display: none; }
+
+#athena-codex .ac-stream-handoff { font-size: 13px; color: var(--ac-muted); }
+#athena-codex .ac-stream-handoff > summary { padding: 5px 0; }
+#athena-codex .ac-stream-handoff > .ac-stream-text { margin: 8px 0; }
+
+#athena-codex .ac-stream-activity { min-width: 0; color: var(--ac-muted); font-size: 13px; }
+#athena-codex .ac-stream-activity > summary { width: fit-content; max-width: 100%; padding: 5px 0; }
+#athena-codex .ac-stream-steps { min-width: 0; padding: 6px 0 0 12px; border-left: 1px solid var(--ac-line); }
+#athena-codex .ac-stream-steps > .aw-attempt, #athena-codex .ac-stream-steps > .ac-stream-tool { margin: 2px 0; }
 
 /* Extension and research records use Athena's existing warm, compact palette. */
 #athena-codex .aex-host { min-width: 0; color: #35372f; font-size: 12px; line-height: 1.6; }
@@ -2650,6 +2678,16 @@ html[data-athena-hosted="true"] #athena-codex:not([data-workspace-mode]) #ac-pi-
 #athena-codex .arb-error { color: #954b40; background: #fff2ed; border: 1px solid #e9cfc8; border-radius: 6px; padding: 8px; }
 #athena-codex .arb-panel :is(button,input,textarea,select,summary):focus-visible { outline: 2px solid #808977; outline-offset: 3px; }
 @media (max-width: 600px) { #athena-codex .arb-card-heading { flex-wrap: wrap; } }
+
+#ac-research-flow [data-flow-tab][aria-pressed=true]{font-weight:700;text-decoration:underline}
+.ac-flow-stages{padding-left:1.35em}.ac-flow-stages li{margin:.6em 0}.ac-flow-stages summary{cursor:pointer}.ac-flow-stages summary span{float:right;font-size:.83em}
+.ac-flow-stages [data-state=Succeeded]{color:#347050}.ac-flow-stages [data-state=Failed]{color:#933b29}
+#ac-research-flow p,#ac-research-flow pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.ac-flow-page{display:block;width:100%;height:auto;margin-top:12px;border:1px solid #d9d8cc}
+#ac-research-flow table{font-size:.85em;border-spacing:8px 2px}.ac-flow-chart{display:flex;gap:3px;height:50px;margin:4px 0 8px}.ac-flow-chart span{position:relative;width:14px}.ac-flow-chart i{position:absolute;left:0;right:0;background:#487967}
+
+#ac-view-manuscript[data-guided=true][data-editor-open=false]>:not(#ac-research-flow){display:none}
+#ac-live-projects small.ac-project-empty{display:block;overflow-wrap:anywhere}
 
 </style>
 </head>
@@ -2773,6 +2811,10 @@ html[data-athena-hosted="true"] #athena-codex:not([data-workspace-mode]) #ac-pi-
           <button class="ac-button cursor-interaction" data-open="manuscript"><i data-lucide="file-pen-line" aria-hidden="true"></i>View linked manuscript</button>
         </section>
         <section class="ac-panel-body" id="ac-view-manuscript" role="tabpanel" aria-labelledby="ac-tab-manuscript" hidden>
+          <section id="ac-research-flow" class="ac-paper-project" hidden aria-label="Research workflow">
+            <div><button data-flow-tab="progress" aria-pressed="true">Research progress</button><button data-flow-tab="preview" aria-pressed="false">Manuscript preview</button></div>
+            <div data-flow-body></div><p data-flow-notice role="status"></p>
+          </section>
           <section id="ac-paper-project" class="ac-paper-project" aria-label="Manuscript workspace" hidden>
             <h2>Manuscripts</h2><label>Project manuscripts<select data-paper="documents"></select></label>
             <details><summary>New manuscript and sources</summary>
@@ -3794,6 +3836,7 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
     let searchComposing = false, searchCompositionEndedAt = -Infinity;
     let runtimeConnected = false, runtimeSignature = '', runtimeSequence = 0;
     const runtimeRows = new Map();
+    let latestCommands = [], projectSkills = [];
     const selectedItems = new Set();
     let letters = [], chips = [], ghostOffered = false, ghostAccepting = false, ghostSuffix = null;
     let raf = 0, lastTime = 0, timers = [], statusTimer = null, measureQueued = false, ticking = false;
@@ -4015,8 +4058,9 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
     function readQuery() {
       if (composing || input.selectionStart !== input.selectionEnd) return null;
       const before = input.value.slice(0, input.selectionStart);
-      const match = /(?:^|[\s(])@([^\s@]{0,64})$/u.exec(before);
-      return match ? { start: before.lastIndexOf('@'), end: input.selectionStart, text: match[1] } : null;
+      const match = /(?:^|[\s(])([@$])([^\s@$]{0,129})$/u.exec(before);
+      if (match?.[1] === '$' && /^\d/u.test(match[2])) return null;
+      return match ? { start: before.lastIndexOf(match[1]), end: input.selectionStart, trigger: match[1], text: match[2] } : null;
     }
     function filterPicker() {
       query = readQuery();
@@ -4025,11 +4069,16 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
       searchBar.hidden = true;
       filterRows(query.text);
       setPickerOpen(list.length > 0); activate(activeIndex);
-      if (!list.length) live.textContent = runtimeConnected ? 'No matching files or Pi commands.' : 'No matching files, plugins, or skills.';
+      if (!list.length) live.textContent = query.trigger === '$' ? 'No matching skills.' : runtimeConnected ? 'No matching files or Pi commands.' : 'No matching files, plugins, or skills.';
     }
     function filterRows(value) {
       const search = String(value || '').trim().toLocaleLowerCase();
-      list = rows.filter(row => row.available && (row.item.action === 'upload' ? menuMode === 'add' : !search || (row.item.label + ' ' + row.item.description + ' ' + row.item.kind + ' ' + (row.item.aliases || '')).toLocaleLowerCase().includes(search)));
+      const skillsOnly = menuMode === 'mention' && query?.trigger === '$';
+      list = rows.filter(({ available, item }) => {
+        if (!available || (skillsOnly && (item.group !== 'skills' || item.action !== 'command'))) return false;
+        if (item.action === 'upload') return menuMode === 'add';
+        return !search || [item.label, item.description, item.kind, item.aliases].join(' ').toLocaleLowerCase().includes(search);
+      });
       rows.forEach(row => {
         const index = list.indexOf(row); row.on = index >= 0; row.O.t = row.on ? 1 : 0;
         row.button.hidden = !row.on;
@@ -4135,6 +4184,16 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
     function pickMention() {
       const selected = list[activeIndex]; if (!pickerOpen || !selected) return;
       if (selected.item.action === 'upload') { setPickerOpen(false); fileInput.click(); return; }
+      if (selected.item.skillId) {
+        const current = menuMode === 'mention' ? readQuery() : null;
+        if (menuMode === 'mention' && (!current || current.start !== query?.start || current.text !== query.text || current.trigger !== query.trigger)) { filterPicker(); return; }
+        const start = current?.start ?? input.selectionStart;
+        const end = current ? current.end + (input.value.slice(current.end).match(/^[a-z0-9/-]+/u)?.[0].length || 0) : input.selectionEnd;
+        const space = start && !/[\s(]/u.test(input.value[start-1]) ? ' ' : '';
+        input.setRangeText(space + '$' + selected.item.skillId + ' ', start, end, 'end');
+        query = null; queryDismissed = null; setPickerOpen(false); changed(); input.focus();
+        live.textContent = selected.item.label + ' added to your draft.'; return;
+      }
       if (selected.item.action === 'command') { pickRuntimeCommand(selected.item); return; }
       if (menuMode === 'add') {
         if (selectedItems.has(selected.item.id) || hasMention(selected.item)) {
@@ -4185,6 +4244,7 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
     }
     function setRuntimeCommands(commands, config = {}) {
       if (destroyed) return;
+      latestCommands = commands;
       const connected = config.connected === true;
       const normalized = [], seen = new Set();
       if (connected) for (const entry of Array.isArray(commands) ? commands : []) {
@@ -4197,6 +4257,10 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         const source = ['extension', 'prompt', 'skill'].includes(entry.source) ? entry.source : 'command';
         normalized.push({ name, source, description: String(entry.description || '').slice(0, 1200) });
         if (normalized.length >= 200) break;
+      }
+      if (connected) for (const skill of projectSkills) {
+        const name = '$' + skill.id;
+        if (!seen.has(name)) normalized.push({ name, skillId: skill.id, title: skill.name, source: 'skill', description: skill.description });
       }
       const signature = JSON.stringify([connected, hosted(), normalized]);
       if (signature === runtimeSignature) return;
@@ -4212,7 +4276,7 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         const glyph = ({ extension: 'plug', skill: 'book-open', prompt: 'file-text', command: 'slash' })[entry.source];
         const kind = ({ extension: 'Extension', skill: 'Skill', prompt: 'Prompt template', command: 'Command' })[entry.source];
         let row = runtimeRows.get(entry.name);
-        const item = { id: row?.item.id || 'runtime-command-' + (++runtimeSequence), label: '/' + entry.name, command: entry.name, source: entry.source, description: entry.description || 'Add this ' + kind.toLowerCase() + ' to your next message', kind, group, icon: glyph, action: 'command', aliases: entry.name + ' ' + kind };
+        const item = { id: row?.item.id || 'runtime-command-' + (++runtimeSequence), label: entry.skillId ? entry.name : '/' + entry.name, skillId: entry.skillId, command: entry.name, source: entry.source, description: entry.skillId ? [entry.title, entry.description].filter(Boolean).join(' · ') : entry.description || 'Add this ' + kind.toLowerCase() + ' to your next message', kind, group, icon: glyph, action: 'command', aliases: entry.name + ' ' + kind };
         if (!row) { row = createRow(item); runtimeRows.set(entry.name, row); }
         else {
           const previousIcon = row.item.icon;
@@ -4238,7 +4302,7 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         }
       }
       frame.dataset.runtimeConnected = String(connected); picker.dataset.runtimeConnected = String(connected);
-      const label = connected ? 'Add photos, files, and Pi commands' : 'Add photos, files, plugins, and skills';
+      const label = connected ? 'Add photos, files, Pi commands, and skills' : 'Add photos, files, plugins, and skills';
       trigger.setAttribute('aria-label', label); picker.setAttribute('aria-label', label);
       menuSearch.placeholder = connected ? 'Search files, commands, and skills' : 'Search files, plugins, and skills';
       menuSearch.setAttribute('aria-label', menuSearch.placeholder);
@@ -4343,7 +4407,7 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
       if (busy) send.removeAttribute('aria-keyshortcuts');
       else send.setAttribute('aria-keyshortcuts', sendKey === 'mod-enter' ? 'Control+Enter Meta+Enter' : 'Enter');
       q('.acm-hint').textContent = shortcut + ' to send · ' + (sendKey === 'mod-enter' ? 'Enter for a new line' : 'Shift+Enter for a new line');
-      q('#ac-composer-help').textContent = 'Press ' + shortcut + ' to send or ' + (sendKey === 'mod-enter' ? 'Enter' : 'Shift+Enter') + ' for a new line. ' + (runtimeConnected ? 'Use the add button to choose files and Pi commands. A chosen command is added to your draft and runs only when you send it.' : 'Use the add button to choose files, plugins, and skills, or type @ to find a project item.');
+      q('#ac-composer-help').textContent = 'Press ' + shortcut + ' to send or ' + (sendKey === 'mod-enter' ? 'Enter' : 'Shift+Enter') + ' for a new line. ' + (runtimeConnected ? 'Type $ to choose a project skill, or use the add button for files and Pi commands.' : 'Use the add button to choose files, plugins, and skills, or type @ to find a project item.');
     }
     function setSendKey(mode) {
       if (destroyed) return;
@@ -4381,7 +4445,11 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
         if (ghostOffered || ghostAccepting) { event.preventDefault(); endGhostAcceptance(); resetGhost(); }
         return;
       }
-      if (event.key === 'Tab' && pickerOpen) { closePicker(false); return; }
+      if (event.key === 'Tab' && pickerOpen) {
+        if (query?.trigger === '$' && !event.shiftKey) { event.preventDefault(); pickMention(); }
+        else closePicker(false);
+        return;
+      }
       if (event.key === 'Tab' && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && ghostOffered && acceptGhost()) { event.preventDefault(); return; }
       const sendCombination = sendKey === 'mod-enter' ? event.ctrlKey || event.metaKey : !event.ctrlKey && !event.metaKey;
       if (event.key === 'Enter' && !event.shiftKey && !event.altKey && sendCombination && !busy) { event.preventDefault(); if (!event.repeat) submit(); }
@@ -4460,6 +4528,11 @@ lucide.createIcons({icons});\``);if(typeof c>"u")throw new Error("`createIcons()
       closeMenu: () => closePicker(false),
       setSendKey,
       setRuntimeCommands,
+      setProjectSkills(skills) {
+        projectSkills = (skills || []).filter(s => s.enabled && s.roles?.includes('parent'));
+        setRuntimeCommands(latestCommands, {connected:runtimeConnected});
+        if (document.activeElement === input && readQuery()?.trigger === '$') filterPicker();
+      },
       getSendKey: () => sendKey,
       setValue(value) { if (destroyed) return; endGhostAcceptance(); input.value = value == null ? '' : String(value); input.setSelectionRange(input.value.length, input.value.length); queryDismissed = null; activeIndex = 0; changed(); },
       focus() { if (!destroyed) input.focus(); },
@@ -6872,7 +6945,7 @@ window.AthenaManuscripts = {mount(root, options) {
     } catch(error){if(epoch===generation)notice(error);}
     finally{button.disabled=false;if(epoch===generation&&selected)details().catch(notice);}
   },listeners);
-  return {attach(value){service=value;reset();},refresh,reload(version){details(version).catch(notice);},scope(s){
+  return {async select(id){await refresh();await choose(id);},attach(value){service=value;reset();},refresh,reload(version){details(version).catch(notice);},scope(s){
     snapshot=s;
     if(project!==s.projectId||session!==s.sessionId){project=s.projectId;session=s.sessionId;reset();}
     const items=(snapshot.artifacts||[]).filter(a=>a.status==='ready').map(a=>[a.id,a.title]);
@@ -6880,6 +6953,258 @@ window.AthenaManuscripts = {mount(root, options) {
       choices(q('artifacts'),items,'Select a saved result');q('artifacts').dataset.signature=signature;
     }
   },destroy(){controller.abort();generation++;clearTimeout(timer);clearTimeout(historyTimer);}};
+}};
+
+</script>
+<script>
+// The host owns transitions. This panel only reads receipts and invokes explicit recovery.
+window.AthenaResearchFlow={mount(root,options){
+  const el=(tag,txt)=>{const e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;return e;};
+  const button=(txt,action)=>{const b=el('button',txt);b.type='button';b.onclick=action;return b;};
+  let service,snapshot,scope='',selectedRun='',generation=0,timer,signature='',tab='progress',report,version,versionState='',hostRun='',requesting=false;
+  let revisionRequest='',revisionError='';
+  const listeners=new AbortController();
+  const body=root.querySelector('[data-flow-body]'),notice=root.querySelector('[data-flow-notice]');
+  const call=(method,args={})=>service(method,{projectId:snapshot.projectId,sessionId:snapshot.sessionId,...args});
+  const draftBox=el('section'),draftLabel=el('strong'),draftText=el('pre'),draftNode=document.createTextNode('');
+  draftBox.className='ac-live-manuscript';draftBox.setAttribute('aria-label','Live manuscript');draftBox.hidden=true;
+  draftLabel.setAttribute('role','status');draftText.tabIndex=0;draftText.setAttribute('aria-label','Current manuscript text');
+  draftText.append(draftNode);draftBox.append(draftLabel,draftText);body.before(draftBox);
+  let draftOwner='',lastStream=null;
+  function displayDraft(draft){
+    if(!draft){draftBox.hidden=true;draftNode.data='';draftOwner='';return;}
+    draftBox.hidden=false;
+    const label=draft.active?(draft.role==='editor'?'Editing manuscript':'Writing manuscript'):'Saved working draft';
+    if(draftLabel.textContent!==label)draftLabel.textContent=label;
+    const same=draftOwner===draft.attemptId,follow=!same||draftText.scrollHeight-draftText.scrollTop-draftText.clientHeight<24;
+    if(same && draft.text.startsWith(draftNode.data))draftNode.appendData(draft.text.slice(draftNode.length));
+    else draftNode.data=draft.text;
+    draftOwner=draft.attemptId;
+    if(follow)draftText.scrollTop=draftText.scrollHeight;
+  }
+  function viewSignature(){
+    const {liveDraft,...stable}=report||{};
+    const data=tab==='preview'&&report?[report.runId,report.history,report.sections,report.sources,report.version,report.revisionRecovery,report.checkpoint,!!liveDraft]:stable;
+    return JSON.stringify([data,version?.version,version?.compilation,version?.review,hostRun,revisionRequest,revisionError,tab]);
+  }
+  function revisionControls(r){
+    if(!version || version.version!==r.version || version.currentVersion!==r.version || version.assessment?.verdict!=='changes_required')return null;
+    const base=r.version,documentId=r.documentId,g=generation,group=el('section'),findings=el('ul');
+    group.append(el('strong','Independent review requested changes'));
+    for(const finding of version.assessment.findings||[])findings.append(el('li',finding));
+    if(findings.childElementCount)group.append(findings);
+    const recovery=r.revisionRecovery;
+    if(recovery==='restart')group.append(el('p','Another request followed the interrupted revision. Start a new revision from this reviewed edition.'));
+    const revise=button(recovery==='resume'?'Resume revision':recovery==='restart'?'Restart revision':'Revise from review',async()=>{
+      if(revisionRequest||g!==generation)return;
+      revisionRequest=base;revisionError='';render();
+      try{
+        if(recovery==='resume')await call('resumeResearch',{runId:r.runId,expectedAttemptId:r.checkpoint});
+        else await call('startPaper',{documentId,mode:'write',expectedBaseVersion:base,
+          requestId:'review:'+base+(recovery==='restart'?':'+r.manuscriptRunId:'')});
+      }
+      catch(e){if(g===generation)revisionError=e.message;}
+      finally{if(g===generation){revisionRequest='';render();await update();}}
+    });
+    revise.disabled=!!revisionRequest||['queued','running','blocked'].includes(snapshot?.run?.status);
+    group.append(revise);
+    if(revisionError){const error=el('p',revisionError);error.setAttribute('role','alert');group.append(error);}
+    return group;
+  }
+  function tableOrigin(r,table){
+    const group=el('details'),summary=el('summary',table.count+' '+table.condition+' · result and inputs');
+    group.append(summary);let loaded=false;
+    group.ontoggle=async()=>{
+      if(!group.open||loaded)return;loaded=true;
+      const g=generation;
+      try{
+        const data=await call('researchTableInputs',{runId:r.runId,artifactId:table.artifactId,version:table.version});
+        if(g!==generation||!group.isConnected)return;
+        group.append(button(data.result.name,()=>options.open('artifacts',{artifactId:data.result.id,version:data.result.version})),
+          button('Worker and program call',()=>options.open('workflow',{taskId:data.taskId})));
+        for(const file of data.inputs){
+          group.append(el('p',(file.name||file.id)+' · '+file.version));
+          if(file.excerpt)group.append(el('pre',file.excerpt));
+        }
+      }catch(e){loaded=false;notice.textContent=e.message;}
+    };
+    return group;
+  }
+  const expanded=new Map();
+  function render(){
+    signature=viewSignature();
+    const disclosureKey=d=>[body.dataset.flowRun,body.dataset.flowView,d.dataset.disclosure||d.querySelector('summary')?.firstChild?.textContent].join(':');
+    for(const d of body.querySelectorAll('details'))expanded.set(disclosureKey(d),d.open);
+    body.dataset.flowRun=report?.runId||'';body.dataset.flowView=tab;
+    const frag=document.createDocumentFragment();
+    const r=report;
+    if(!r){if(snapshot?.run&&scope){frag.append(el('p','Loading recorded research stages…'));body.replaceChildren(frag);return;}frag.append(el('p','Send the topic, research question and LaTeX template in chat. Attach any research inputs.'));body.replaceChildren(frag);return;}
+    if(r.history.length>1){
+      const history=el('select');history.setAttribute('aria-label','Research request');
+      for(const entry of r.history){const opt=el('option',entry.title);opt.value=entry.runId;history.append(opt);}
+      history.value=r.runId;history.onchange=()=>{displayDraft(null);selectedRun=history.value;generation++;revisionRequest='';revisionError='';signature='';update();};frag.append(history);
+    }
+    if(tab==='progress'){
+      const list=el('ol');list.className='ac-flow-stages';
+      for(const stage of r.stages){
+        const li=el('li'),details=el('details'),summary=el('summary'),title=el('strong',stage.title),status=el('span',stage.status);
+        status.dataset.state=stage.status;summary.append(title,status);details.append(summary);
+        if(stage.description)details.append(el('p',stage.description));
+        if(stage.title==='Research plan' && r.plan){
+          if(r.plan.coordinatorModel)details.append(el('p','Main coordinator · '+r.plan.coordinatorModel));
+          const steps=el('ol'), criteria=el('ul');
+          for(const step of r.plan.stages)steps.append(el('li',step));
+          for(const criterion of r.plan.acceptanceCriteria)criteria.append(el('li',criterion));
+          details.append(steps,el('strong','Acceptance criteria'),criteria);
+        }
+        if(stage.title==='Experiment' && r.experimentMission){
+          const mission=r.experimentMission, c=mission.contract, trials=el('ol');
+          const metric=c.metricPath.at(-1) || c.resultFile;
+          const showValue=value=>String(Number(value.toPrecision(7)));
+          details.append(el('p',metric+' '+(c.direction==='at_most'?'≤':'≥')+' '+c.target+' · '+c.maxTrials+' trials allowed'));
+          if(mission.best)details.append(el('p','Best measured value: '+showValue(mission.best.value)+' (trial '+mission.best.trial+')'));
+          for(const t of mission.trials){
+            const row=el('li'), decision=t.decision;
+            row.append(el('strong',decision?.parentTrial?'Based on trial '+decision.parentTrial:'Trial '+t.number));
+            if(decision?.instruction)row.append(el('p',decision.instruction));
+            if(decision)row.append(el('p',decision.reason));
+            if(t.workerNote){
+              const note=el('details');
+              note.dataset.disclosure='worker-note-'+t.number;
+              note.append(el('summary','Worker observation'),el('p',t.workerNote));
+              row.append(note);
+            }
+            const planner=t.planners.at(-1);
+            if(planner)row.append(button('Planner',()=>options.open('workflow',{taskId:planner.taskId})));
+            if(t.outcome?.artifact){
+              const {artifact,value}=t.outcome;
+              row.append(button(metric+' = '+showValue(value),()=>options.open('artifacts',{artifactId:artifact.id,version:artifact.version})));
+            }else if(t.outcome?.error){
+              row.append(el('p',t.outcome.error));
+              const candidate=t.outcome.candidate;
+              if(candidate)row.append(button('Inspect result',()=>options.open('artifacts',{artifactId:candidate.id,version:candidate.version})));
+            }
+            trials.append(row);
+          }
+          details.append(trials);
+        }
+        if(stage.title==='Manuscript' && r.sectionBriefs?.length){
+          for(const brief of r.sectionBriefs)details.append(el('p',brief.heading+' · '+brief.purpose+(brief.visual?' · '+brief.visual:'')));
+        }
+        if(stage.title==='Independent review'){const controls=revisionControls(r);if(controls)details.append(controls);}
+        if(stage.taskId)details.append(button('Worker, attempts and tools',()=>options.open('workflow',{taskId:stage.taskId})));
+        li.append(details);list.append(li);
+      }
+      frag.append(list,button('Workflow graph',()=>options.open('workflow',{taskId:r.stages[0].taskId})));
+      if(r.canResume)frag.append(button('Resume from saved checkpoint',()=>recover('resumeResearch',{runId:r.runId,expectedAttemptId:r.checkpoint})));
+      if(r.error)frag.append(el('p',r.error));
+      for(const art of r.artifacts){
+        frag.append(button(art.name,()=>options.open('artifacts',{artifactId:art.id})));
+        const measured=r.tables?.find(t=>t.artifactId===art.id&&t.version===art.version);
+        const data=measured?{samples:measured.rows}:null;
+        if(Array.isArray(data?.samples)&&data.samples.length&&data.samples.every(row=>row&&typeof row==='object'&&!Array.isArray(row))){
+          const tbl=el('table'),keys=Object.keys(data.samples[0]).slice(0,5);
+          const origin=tableOrigin(r,measured),caption=el('caption');caption.append(button((measured?.count??data.samples.length)+' '+(measured?.condition||'sampled conditions'),()=>{origin.open=true;origin.scrollIntoView({block:'nearest'});}));tbl.append(caption);
+          const head=el('tr');keys.forEach(k=>head.append(el('th',k)));tbl.append(head);
+          for(const row of data.samples.slice(0,12)){const tr=el('tr');keys.forEach(k=>tr.append(el('td',typeof row[k]==='number'?Number(row[k].toPrecision(6)):String(row[k]))));tbl.append(tr);}
+          frag.append(tbl,origin);
+          if(keys.length>=2){
+            const values=data.samples.map(item=>item[keys[1]]).filter(Number.isFinite);
+            if(values.length){
+              const chart=el('div');chart.className='ac-flow-chart';chart.setAttribute('aria-label',keys[1]+' by sampled condition');
+              const scale=Math.max(...values.map(Math.abs))||1,lo=Math.min(0,...values)/scale,hi=Math.max(0,...values)/scale;
+              const span=hi-lo||1,baseline=100*hi/span;
+              for(const v of values.slice(0,40)){
+                const slot=el('span'),bar=el('i');slot.title=keys[1]+' '+v;
+                const height=Math.abs(v/scale)/span*100;bar.style.height=Math.max(.8,height)+'%';
+                bar.style.top=(v>0?baseline-height:baseline)+'%';slot.append(bar);chart.append(slot);
+              }
+              frag.append(chart);
+            }
+          }
+        }
+      }
+      const tools=el('details');tools.append(el('summary','Connected experiment and browsing tools'));
+      tools.append(el('p',r.connections.length?r.connections.map(s=>s.name+' · '+s.tools.join(', ')).join('\n'):'No external MCP connection. Browser Use page research and Computer Use GUI experiments require an enabled, verified server.'));
+      for(const kind of ['browser','computer'])if(!r.connections.some(c=>c.capability===kind))tools.append(el('p',kind==='browser'?'Browser Use · no designated page-reading connection':'Computer Use · no designated GUI connection'));
+      for(const c of r.connections)for(const job of c.calls)tools.append(el('p',c.name+' / '+job.tool+' · '+job.status));
+      frag.append(tools);
+    }else{
+      if(version){
+        frag.append(el('h3',version.title),el('p','Revision '+version.version.slice(0,8)+' · '+version.review.status));
+        const c=version.compilation;
+        if(c?.state==='succeeded'){
+          for(const file of [c.tex,c.pdf]){const a=el('a',file.name);a.href=file.uri;a.download=file.name;frag.append(a,document.createTextNode('  '));}
+          if(c.updateAvailable){
+            const updatePdf=button('Update typesetting',async()=>{updatePdf.disabled=true;await recover('compilePaper',{documentId:r.documentId,version:version.version});updatePdf.disabled=false;});
+            frag.append(updatePdf);
+            if(c.refreshError)frag.append(el('p',c.refreshError));
+          }
+          frag.append(button('Review JSON',async()=>{try{const receipt=await call('exportPaper',{documentId:r.documentId,version:version.version,format:'json'});const a=el('a');a.href=receipt.uri;a.download=receipt.name;a.click();}catch(e){notice.textContent=e.message;}}));
+          for(const [n,page] of (c.pages||[]).entries()){const img=el('img');img.src=page.uri;img.alt='Compiled PDF page '+(n+1);img.className='ac-flow-page';frag.append(img);}
+          if(c.previewError)frag.append(el('p',c.previewError));
+        }else if(version.review.status==='approved'){
+          frag.append(el('p',c?.error||'Waiting for LaTeX compilation.'),button('Typeset reviewed revision',()=>recover('compilePaper',{documentId:r.documentId,version:version.version})));
+        }else{
+          const controls=revisionControls(r);if(controls)frag.append(controls);
+        }
+        for(const table of r.tables||[]){if(r.sources?.some(s=>s.source?.id===table.artifactId&&s.source.version===table.version)){frag.append(tableOrigin(r,table));}}
+        for(const src of r.sources||[]){
+          if(src.unresolved)frag.append(el('p','Unresolved evidence · '+src.quote+' · '+src.locator));
+          else if(src.source?.kind==='artifact')frag.append(button(src.quote+' · input and result',()=>options.open('workflow',{taskId:src.source.taskId})));
+        }
+        const sectionList=el('details');sectionList.append(el('summary','Section checks'));
+        for(const section of version.sectionChecks||[]){
+          sectionList.append(el('p',section.heading+' · draft saved · '+section.linkedPassages+' linked passages · '+(version.review.status==='approved'?'in independently reviewed revision':version.review.status)));
+        }
+        frag.append(sectionList,button('Open manuscript editor',()=>options.editor(r.documentId).catch(e=>{notice.textContent=e.message;})));
+        const draft=el('details');draft.append(el('summary','Saved manuscript'),el('pre',version.text));frag.append(draft);
+      }else if(r.version){
+        frag.append(el('p','Loading saved manuscript…'));
+      }else if(r.sections?.length){
+        for(const s of r.sections)frag.append(el('h4',s.heading),el('p',s.text),el('small','Draft · awaiting review'));
+      }else if(!r.liveDraft)frag.append(el('p','The working draft will appear here when the writer starts.'));
+    }
+    for(const detail of frag.querySelectorAll('details'))detail.open=expanded.get(disclosureKey(detail))===true;
+    body.replaceChildren(frag);
+  }
+  async function recover(method,args){try{await call(method,args);signature='';versionState='';await update();}catch(e){versionState='';notice.textContent=e.message;}}
+  async function update(){
+    clearTimeout(timer);if(!scope||!service||requesting)return;
+    const g=generation;requesting=true;
+    try{
+      const r=await call('researchFlow',selectedRun?{runId:selectedRun}:{});if(g!==generation)return;
+      report=r;
+      const fresh=lastStream && r?.runId===lastStream.runId && performance.now()-lastStream.received<1900;
+      const ahead=fresh && (!r.liveDraft||lastStream.draft.updatedAt>r.liveDraft.updatedAt);
+      displayDraft(ahead && !r.version?lastStream.draft:r?.liveDraft);
+      const revision=JSON.stringify([r?.version,r?.compilationReceipt,r?.stages.slice(-2)]);
+      if(version?.version!==r?.version)version=null;
+      function refresh(){
+        if(viewSignature()!==signature)render();
+      }
+      refresh();
+      if(r?.version&&(!version||revision!==versionState)){
+        const saved=await call('getDocument',{documentId:r.documentId,version:r.version});
+        if(g!==generation)return;
+        version=saved;versionState=revision;refresh();
+      }
+      const stage=r?.stages.find(s=>s.status==='Running')||r?.stages.filter(s=>s.status==='Succeeded').at(-1);
+      options.stage(stage?stage.title+' · '+stage.status:'');
+      notice.textContent='';
+    }catch(e){if(g===generation)notice.textContent=e.message;}
+    finally{requesting=false;if(scope&&service)timer=setTimeout(update,g===generation?800:0);}
+  }
+  root.addEventListener('click',e=>{const b=e.target.closest('[data-flow-tab]');if(!b)return;tab=b.dataset.flowTab;
+    root.querySelectorAll('[data-flow-tab]').forEach(btn=>btn.setAttribute('aria-pressed',String(btn===b)));render();},{signal:listeners.signal});
+  return {receiveDraft(event){
+    if(event.sessionId!==scope || (selectedRun||report?.runId)!==event.runId || !event.draft?.active)return;
+    lastStream={...event,received:performance.now()};displayDraft(event.draft);
+  },attach(fn){service=fn;if(scope)update();},scope(s){snapshot=s;const next=s.projects?.find(p=>p.id===s.projectId)?.researchWorkflow&&s.sessionId||'';
+    const run=(s.run?.id||'')+' '+(s.run?.status||'');
+    if(scope===next){if(scope&&hostRun!==run){hostRun=run;if(!report)render();if(!requesting)update();}return;}
+    hostRun=run;scope=next;selectedRun='';generation++;revisionRequest='';revisionError='';lastStream=null;displayDraft(null);report=null;version=null;signature='';versionState='';root.hidden=!scope;clearTimeout(timer);notice.textContent='';options.stage('');render();if(scope)update();},
+    destroy(){listeners.abort();generation++;scope='';clearTimeout(timer);}};
 }};
 
 </script>
@@ -8241,7 +8566,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
           ${field('endpoint', 'Endpoint base URL', 'url', 'Credentials and query parameters are not stored in endpoint URLs.', 'autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="2048" placeholder="http://localhost:11434/v1" required')}
           ${field('defaultModel', 'App default model', 'text', 'Used for new conversations unless the project or conversation selects another model.', 'autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="160" placeholder="your-model-id" required')}
         </section>
-        <section class="ams-section" data-ams-execution-section aria-labelledby="${prefix}routing-title">
+        <section class="ams-section" data-ams-execution-section data-legacy-role-routing aria-labelledby="${prefix}routing-title">
           <div class="ams-section-title"><h3 id="${prefix}routing-title">Role routing</h3><span>02</span></div>
           <p class="ams-section-copy">Leave a role blank to inherit the default model.</p>
           <div class="ams-routes">
@@ -8639,8 +8964,13 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         <p class="ams-section-copy" role="status" data-amp-migration-status hidden></p>
         <button type="button" class="ams-btn cursor-interaction" data-amp-import-credentials hidden>Approve import from Keychain</button>
 
+        <section class="amp-section" data-amp-routing hidden aria-labelledby="amp-routing-title">
+          <h3 id="amp-routing-title">Worker models</h3>
+          <p class="ams-section-copy">Choose a saved profile and reasoning level for each role. Changes apply to the next research request.</p>
+          <div data-amp-roles></div>
+        </section>
         <section class="amp-section" aria-labelledby="amp-providers-title">
-          <div class="ams-section-title"><h3 id="amp-providers-title">Provider credentials</h3><span>01</span></div>
+          <div class="ams-section-title"><h3 id="amp-providers-title">Provider credentials</h3></div>
           <p class="ams-section-copy">Search the providers registered by the installed Pi SDK. Sign-in methods come from the SDK and Athena's provider policy.</p>
           <label class="amp-search">${icon('search')}<input type="search" data-amp-provider-search placeholder="Search providers" aria-label="Search providers" autocomplete="off" spellcheck="false"></label>
           <div class="amp-list" role="list" data-amp-providers></div>
@@ -8659,7 +8989,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         </section>
 
         <section class="amp-section" aria-labelledby="amp-catalog-title">
-          <div class="ams-section-title"><h3 id="amp-catalog-title">Model catalog</h3><span>02</span></div>
+          <div class="ams-section-title"><h3 id="amp-catalog-title">Model catalog</h3></div>
           <p class="ams-section-copy">The catalog lists models registered in the SDK. Eligibility marks the models your credentials can select. Only an explicit profile verification probes a live inference.</p>
           <div class="amp-catalog-bar">
             <select class="ams-input cursor-interaction" data-amp-catalog-provider aria-label="Catalog provider"></select>
@@ -8680,7 +9010,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         </section>
 
         <section class="amp-section" aria-labelledby="amp-profiles-title">
-          <div class="ams-section-title"><h3 id="amp-profiles-title">Saved model profiles</h3><span>03</span></div>
+          <div class="ams-section-title"><h3 id="amp-profiles-title">Saved model profiles</h3></div>
           <p class="amp-section-copy" data-amp-profiles-intro></p>
           <div class="amp-list" role="list" data-amp-profiles></div>
           <p class="amp-error" role="alert" data-amp-profiles-error hidden></p>
@@ -8705,6 +9035,10 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       </div>`;
     const root = slot.querySelector('.amp-root');
     const q = selector => root.querySelector(selector);
+    const routingPanel = q('[data-amp-routing]');
+    const roleList = q('[data-amp-roles]');
+    const routingSlot = slot.closest('[role="tabpanel"]')?.querySelector('#ast-worker-models-slot');
+    routingSlot?.appendChild(routingPanel);
     const listNode = key => q('[data-amp-' + key + ']');
 
     const workspace = () => options.getWorkspace?.() || {};
@@ -8889,7 +9223,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
     async function loadList() {
       await call('list', () => adapter.listModelProfiles(), result => {
         list = {
-          profiles: rows(result?.profiles),
+          profiles: rows(result?.profiles), workerRoles:rows(result?.workerRoles),
           appDefaultProfileId: idOf(result?.appDefaultProfileId),
           credentialMode: idOf(result?.credentialMode),
           credentialMigration: idOf(result?.credentialMigration),
@@ -9193,6 +9527,34 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         <button type="button" class="ams-button cursor-interaction amp-danger" data-amp-action="delete" data-amp-profile-id="${escapeHTML(profile.id)}">${icon('trash-2')}Delete</button>
       </div>`;
     }
+    let roleSignature='';
+    function renderWorkerRoles(){
+      const panel=routingPanel,roles=rows(list.workerRoles);
+      panel.hidden=!adapter?.setWorkerModelPreference||!roles.length;
+      slot.closest('.ast-content')?.classList.toggle('amp-live-roles',!panel.hidden);
+      if(panel.hidden)return;
+      const inherited=profileById(currentSession()?.profileId) || profileById(currentProject()?.defaultProfileId) || profileById(list.appDefaultProfileId) || list.hostModel;
+      const signature=JSON.stringify([roles,inherited,list.profiles.map(p=>[p.id,p.name,p.modelId,p.thinkingLevel,p.supportedLevels]),at('worker-role')]);
+      if(roleSignature===signature)return;
+      roleSignature=signature;
+      const option=(value,label,selected)=>'<option value="'+escapeHTML(value)+'"'+(selected?' selected':'')+'>'+escapeHTML(label)+'</option>';
+      roleList.innerHTML=roles.map(r=>{
+        const profile=list.profiles.find(p=>p.id===r.profileId),disabled=at('worker-role')?' disabled':'';
+        const models=option('',inherited?.modelId?'Inherit · '+inherited.modelId:'Inherit conversation',!profile)+list.profiles.map(p=>option(p.id,p.name+' · '+p.modelId,p.id===r.profileId)).join('');
+        const levels=profile?(option('','Profile · '+profile.thinkingLevel,r.thinkingLevel===null)+(profile.supportedLevels||[profile.thinkingLevel]).map(l=>option(l,LEVEL_LABELS[l]||l,r.thinkingLevel===l)).join('')):option('',inherited?.thinkingLevel?'Inherit · '+inherited.thinkingLevel:'Inherit conversation',true);
+        return '<div class="amp-worker-row"><strong>'+escapeHTML(r.label)+'</strong><select class="ams-input" data-role-profile="'+escapeHTML(r.role)+'" aria-label="'+escapeHTML(r.label)+' model"'+disabled+'>'+models+'</select><select class="ams-input" data-role-level="'+escapeHTML(r.role)+'" aria-label="'+escapeHTML(r.label)+' reasoning"'+(!profile||disabled?' disabled':'')+'>'+levels+'</select></div>';
+      }).join('');
+    }
+    listen(roleList,'change',event=>{
+      const control=event.target,role=control.dataset.roleProfile||control.dataset.roleLevel;
+      const row=list.workerRoles?.find(r=>r.role===role);
+      if(!row||!adapter?.setWorkerModelPreference)return;
+      const profileId=control.dataset.roleProfile?control.value||null:row.profileId;
+      const thinkingLevel=control.dataset.roleLevel?control.value||null:null;
+      void call('worker-role',()=>adapter.setWorkerModelPreference({role,profileId,thinkingLevel}),result=>{
+        list.workerRoles=rows(result.workerRoles);
+      });
+    });
     function renderProfiles() {
       const intro = q('[data-amp-profiles-intro]');
       const hostModel = list.hostModel;
@@ -9319,6 +9681,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       if (destroyed) return;
       root.hidden = !adapter;
       root.dataset.ampMounted = String(Boolean(adapter));
+      renderWorkerRoles();
       if (!adapter) return;
       renderProviders();
       renderCatalog();
@@ -9454,11 +9817,15 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
           const profile = profileById(profileId);
           return profile ? { name: profile.name, provider: profile.provider, modelId: profile.modelId, thinkingLevel: profile.thinkingLevel } : null;
         };
-        const runModel = snapshot?.run?.model;
+        const runModel = snapshot?.run?.id && snapshot.run.model;
+        const app = label(list.appDefaultProfileId) || list.hostModel || null;
+        const projectProfile = project?.defaultProfileId ? label(project.defaultProfileId) : null;
+        const effective = projectProfile || project?.defaultModel || app;
+        const inherited = value => value ? 'Inherit · '+(value.name || value.modelId || value.id) : null;
         return {
-          appDefault: label(list.appDefaultProfileId) || list.hostModel || null,
-          projectDefault: project && idOf(project.defaultProfileId) ? label(project.defaultProfileId) || 'Profile ' + project.defaultProfileId : null,
-          conversation: session && idOf(session.profileId) ? label(session.profileId) || 'Profile ' + session.profileId : null,
+          appDefault: app,
+          projectDefault: project && idOf(project.defaultProfileId) ? projectProfile || 'Profile ' + project.defaultProfileId : project ? inherited(app) : null,
+          conversation: session && idOf(session.profileId) ? label(session.profileId) || 'Profile ' + session.profileId : session ? inherited(effective) || 'Inherit project default' : null,
           runLocked: runModel ? { name: runModel.name || runModel.modelId || runModel.id, provider: runModel.provider, modelId: runModel.modelId || runModel.id, thinkingLevel: runModel.thinkingLevel } : null
         };
       },
@@ -9471,6 +9838,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         destroyed = true; generation++; owners.clear();
         clearTimeout(flowTimer); clearTimeout(providerSearchTimer);
         controller.abort();
+        routingPanel.remove();
         root.remove();
       }
     };
@@ -9507,7 +9875,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
     host.classList.add('aex-host');
     host.innerHTML = '<div class="aex-heading"><div><h3>Project tools &amp; skills</h3><p data-aex-project></p></div><button type="button" class="ast-button cursor-interaction" data-aex-action="refresh">' + icon('refresh-cw') + 'Refresh</button></div>'
       + '<p class="aex-note" data-aex-availability></p><p class="aex-error" role="alert" data-aex-error hidden></p><p class="aex-note" role="status" data-aex-status hidden></p>'
-      + '<div data-aex-content hidden><details class="aex-import" data-aex-detail="import"><summary class="cursor-interaction">Import or update a plugin</summary>'
+      + '<div data-aex-content hidden><button type="button" class="ast-button cursor-interaction" data-aex-action="install-github">Install GitHub plugin</button><details class="aex-import" data-aex-detail="import"><summary class="cursor-interaction">Import or update a plugin</summary>'
       + '<p class="aex-note">Import a declarative JSON package containing skills and MCP server settings. New and updated packages start disabled. No package scripts are executed.</p>'
       + '<label class="aex-field">Package file<input type="file" accept=".json,application/json" data-aex-file></label>'
       + '<label class="aex-field">Package JSON<textarea rows="7" spellcheck="false" autocomplete="off" data-aex-manifest placeholder="Paste the plugin manifest"></textarea></label>'
@@ -9528,14 +9896,15 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
 
     function serverHTML(plugin, server) {
       const checked = server.status === 'verified';
-      const credential = server.auth === 'bearer' ? '<label class="aex-field">Bearer token <span class="aex-note">(leave blank to use the saved connection)</span><input type="password" autocomplete="off" maxlength="8192" data-aex-token data-plugin="' + esc(plugin.id) + '" data-server="' + esc(server.id) + '" aria-label="Bearer token for ' + esc(server.name) + '"></label>' : '';
+      const github = plugin.id === 'athena-github';
+      const credential = server.auth === 'bearer' ? '<label class="aex-field">' + (github ? 'GitHub personal access token' : 'Bearer token') + ' <span class="aex-note">(leave blank to use the saved connection)</span><input type="password" autocomplete="off" maxlength="8192" data-aex-token data-plugin="' + esc(plugin.id) + '" data-server="' + esc(server.id) + '" aria-label="Bearer token for ' + esc(server.name) + '"></label>' : '';
       const toolNames = rows(server.verification?.tools).map(tool => tool.name);
       return '<div class="aex-server"><div class="aex-card-heading"><strong>' + esc(server.name) + '</strong><span class="aex-badge" data-state="' + (checked ? 'checked' : 'idle') + '">' + (checked ? 'Connection checked' : server.status === 'failed' ? 'Connection failed' : 'Not checked') + '</span></div>'
         + '<p class="aex-endpoint">' + esc(server.url) + '</p><p class="aex-note">Calls are restricted to the tools listed below. Local project files are not transferred automatically.</p>'
         + (rows(server.allowedTools).length ? '<p class="aex-note">Approved tools: ' + rows(server.allowedTools).map(esc).join(', ') + '</p>' : '')
         + (server.lastError ? '<p class="aex-error">' + esc(server.lastError) + '</p>' : '')
-        + (server.auth === 'bearer' ? '<p class="aex-note">' + (server.credentialConfigured ? 'A dedicated connection token is saved by the host.' : 'This server requires a dedicated connection token.') + '</p>' : '') + credential
-        + '<button type="button" class="ast-button cursor-interaction" data-aex-action="check" data-plugin="' + esc(plugin.id) + '" data-server="' + esc(server.id) + '" data-aex-focus="check-' + esc(plugin.id + '-' + server.id) + '">' + icon('plug-zap') + (checked ? 'Check connection again' : 'Check connection') + '</button>'
+        + (server.auth === 'bearer' ? '<p class="aex-note">' + (server.credentialConfigured ? 'A dedicated connection token is saved by the host.' : 'This server requires a dedicated connection token.') + '</p>' : '') + (github ? '<p class="aex-note">Use a fine-grained token with read access to contents and metadata for the repositories you select.</p>' : '') + credential
+        + '<button type="button" class="ast-button cursor-interaction" data-aex-action="check" data-plugin="' + esc(plugin.id) + '" data-server="' + esc(server.id) + '" data-aex-focus="check-' + esc(plugin.id + '-' + server.id) + '">' + icon('plug-zap') + (github && !plugin.enabled ? 'Connect and enable GitHub' : checked ? 'Check connection again' : 'Check connection') + '</button>'
         + (checked ? '<p class="aex-note">Discovery completed ' + esc(when(server.verification?.checkedAt)) + '. A connection check does not execute a research calculation.</p>' : '')
         + diagnostics([['Transport', server.transport], ['Server ID', server.id], ['Server identity', server.verification?.serverInfo], ['MCP protocol', server.verification?.protocolVersion], ['Schema digest', server.verification?.digest], ['Discovered tools', toolNames]], 'server-' + plugin.id + '-' + server.id) + '</div>';
     }
@@ -9545,7 +9914,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       const disabled = !plugin.enabled && !ready;
       return '<article class="aex-card" data-aex-plugin="' + esc(plugin.id) + '"><div class="aex-card-heading"><div><h4>' + esc(plugin.name) + '</h4><span class="aex-note">Version ' + esc(plugin.version) + (plugin.builtin ? ' · Built in' : '') + '</span></div><span class="aex-badge" data-state="' + (plugin.enabled ? 'enabled' : 'idle') + '">' + (plugin.enabled ? 'Enabled' : 'Installed · Disabled') + '</span></div>'
         + '<p>' + esc(plugin.description) + '</p>' + (rows(plugin.servers).length ? '<p class="aex-note">Enabling permits calls to the approved endpoints below. Each call sends its tool arguments from this device to that endpoint.</p>' : '') + '<div class="aex-actions"><button type="button" class="ast-button cursor-interaction" data-aex-action="toggle-plugin" data-plugin="' + esc(plugin.id) + '" data-aex-focus="plugin-' + esc(plugin.id) + '"' + (disabled ? ' disabled title="Check each MCP connection before enabling this package"' : '') + '>' + (plugin.enabled ? 'Disable' : 'Enable') + '</button>'
-        + (!plugin.builtin ? '<button type="button" class="aex-text-button cursor-interaction" data-aex-action="remove" data-plugin="' + esc(plugin.id) + '">Remove</button>' : '') + '</div>'
+        + (!plugin.builtin || plugin.id === 'athena-github' ? '<button type="button" class="aex-text-button cursor-interaction" data-aex-action="remove" data-plugin="' + esc(plugin.id) + '">Remove</button>' : '') + '</div>'
         + (disabled ? '<p class="aex-note">Check each MCP connection before enabling this package.</p>' : '')
         + rows(plugin.servers).map(server => serverHTML(plugin, server)).join('')
         + diagnostics([['Package ID', plugin.id], ['Revision', plugin.revision], ['Installed', when(plugin.installedAt)], ['Updated', when(plugin.updatedAt)], ['Skills', rows(plugin.skills).map(skill => skill.name)]], 'plugin-' + plugin.id) + '</article>';
@@ -9574,6 +9943,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
 
     function render() {
       if (destroyed) return;
+      options.onSkillsChange?.(sessionId && supported() ? snapshot?.skills || [] : []);
       const project = rows(workspace().projects).find(item => item.id === projectId);
       q('[data-aex-project]').textContent = project?.name || (projectId ? 'Current project' : 'Select a project');
       q('[data-aex-availability]').textContent = !service ? 'Connect an Athena host with extension support to manage real packages and skills.' : !projectId ? 'Open a project conversation to manage its tools and skills.' : '';
@@ -9592,6 +9962,10 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       }
       for (const button of host.querySelectorAll('button')) {
         if (button.dataset.aexAction === 'refresh') button.disabled = !supported() || busy;
+        else if (button.dataset.aexAction === 'install-github') {
+          button.hidden = !service?.installGitHubPlugin || rows(snapshot?.plugins).some(plugin => plugin.id === 'athena-github');
+          button.disabled = !supported() || !snapshot || busy;
+        }
         else if (button.dataset.aexAction === 'install') button.disabled = !supported() || !snapshot || busy;
         else if (busy || !supported()) button.disabled = true;
       }
@@ -9674,6 +10048,10 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       if (!button || !host.contains(button) || button.disabled) return;
       const action = button.dataset.aexAction;
       if (action === 'refresh') { void refresh(); return; }
+      if (action === 'install-github') {
+        void mutate((scope, revision) => service.installGitHubPlugin(scope, revision), 'GitHub installed. Enter a personal access token to connect this project.');
+        return;
+      }
       if (action === 'install') {
         const value = q('[data-aex-manifest]').value;
         let manifest;
@@ -9690,11 +10068,18 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       const plugin = rows(snapshot?.plugins).find(item => item.id === button.dataset.plugin);
       if (!plugin) return;
       if (action === 'toggle-plugin') void mutate((scope, revision) => service.setPluginEnabled(scope, plugin.id, !plugin.enabled, revision), plugin.enabled ? 'Package disabled for new runs.' : 'Package enabled for new runs.');
-      if (action === 'remove' && !plugin.builtin) void mutate((scope, revision) => service.removePlugin(scope, plugin.id, revision), 'Package removed from future selection. Existing research keeps its saved versions.');
+      if (action === 'remove' && (!plugin.builtin || plugin.id === 'athena-github')) void mutate((scope, revision) => service.removePlugin(scope, plugin.id, revision), 'Package removed from future selection. Existing research keeps its saved versions.');
       if (action === 'check') {
         const server = rows(plugin.servers).find(item => item.id === button.dataset.server); if (!server) return;
         const field = [...host.querySelectorAll('[data-aex-token]')].find(item => item.dataset.plugin === plugin.id && item.dataset.server === server.id);
         const token = field?.value || ''; if (field) field.value = '';
+        if (plugin.id === 'athena-github' && !plugin.enabled) {
+          void mutate(async (scope, revision) => {
+            const checked = await service.checkMcpServer(scope, plugin.id, server.id, revision, token ? {token} : {});
+            await service.setPluginEnabled(scope, plugin.id, true, checked.revision);
+          }, 'GitHub connected. Repository tools are available to workers in new runs.');
+          return;
+        }
         void mutate((scope, revision) => service.checkMcpServer(scope, plugin.id, server.id, revision, token ? { token } : {}), 'MCP connection and approved tool schemas checked.');
       }
     }, { signal: controller.signal });
@@ -9781,6 +10166,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
     const initialSources = project => !runtimeMode && project === 'project-rc' ? SAMPLES.map((source, index) => sourceDefaults({ ...source, origin: 'sample', isSample: true, sessionOnly: false, pinned: index === 0, createdAt: '', order: index }, project)) : [];
     let sources = initialSources(projectId);
     const storageKey = () => KNOWLEDGE_NAMESPACE + ':' + encodeURIComponent(projectId);
+    const editionPinKey = source => storageKey() + ':pin:' + encodeURIComponent(source.id) + ':' + encodeURIComponent(source.sourceVersion);
     function loadProjectStorage() {
     try {
       const raw = window.localStorage.getItem(storageKey()) || (projectId === 'project-rc' ? window.localStorage.getItem(KNOWLEDGE_NAMESPACE) : null);
@@ -9814,7 +10200,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       <header class="akn-heading">
         <div class="akn-heading-top"><span class="akn-eyebrow">PROJECT LIBRARY</span><span class="akn-count" data-akn-total></span></div>
         <h2 id="${prefix}title">Knowledge</h2>
-        <p>Keep useful material close to the work.</p><p class="akn-project-scope" data-akn-project></p>
+        <p class="akn-project-scope" data-akn-project></p>
         <div class="akn-top-actions">
           <button type="button" class="akn-button akn-import-button cursor-interaction" data-akn-action="import">${icon('upload')}<span data-akn-import-label>Import files</span></button>
           <button type="button" class="akn-button cursor-interaction" data-akn-action="add-note" aria-expanded="false" aria-controls="${prefix}note-form">${icon('plus')}Add note</button>
@@ -9824,7 +10210,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       </header>
       <div class="akn-toolbar">
         <label class="akn-search"><span class="akn-sr-only">Search sources</span>${icon('search')}<input type="search" name="knowledge-search" placeholder="Search titles and text…" autocomplete="off" spellcheck="false"><button type="button" class="akn-search-clear cursor-interaction" data-akn-action="clear-search" aria-label="Clear source search" hidden>${icon('x')}</button></label>
-        <div class="akn-filters"><label class="akn-filter-label"><span class="akn-sr-only">Source type</span><select class="akn-filter cursor-interaction" aria-label="Source type"><option value="all">All sources</option><option value="documents">Documents</option><option value="notes">Notes</option><option value="datasets">Datasets</option></select></label><button type="button" class="akn-pinned-filter cursor-interaction" data-akn-action="pinned-filter" aria-pressed="false">${icon('pin')}Pinned</button></div>
+        <button type="button" class="akn-button" data-akn-find-papers hidden>Search and save papers</button><div class="akn-filters"><label class="akn-filter-label"><span class="akn-sr-only">Source type</span><select class="akn-filter cursor-interaction" aria-label="Source type"><option value="all">All sources</option><option value="documents">Documents</option><option value="notes">Notes</option><option value="datasets">Datasets</option></select></label><button type="button" class="akn-pinned-filter cursor-interaction" data-akn-action="pinned-filter" aria-pressed="false">${icon('pin')}Pinned</button></div>
       </div>
       <div class="akn-scroll">
         <form class="akn-note-form" id="${prefix}note-form" aria-labelledby="${prefix}note-title" novalidate hidden>
@@ -9862,8 +10248,27 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       notice.hidden = !message;
       notice.dataset.tone = tone;
     }
+    let searchingPapers=false;
+    const findPapers=q('[data-akn-find-papers]');
+    listen(findPapers,'click',async()=>{
+      const term=searchInput.value.trim(),project=projectId,bound=serviceEpoch;
+      if(!term){showNotice('Enter a public research topic or DOI.');searchInput.focus();return;}
+      if(searchingPapers||!service?.canSearch?.(project))return;
+      searchingPapers=true;findPapers.disabled=true;showNotice('Searching public literature…');
+      try{
+        const result=await service.searchAndSave({projectId:project,term,mode:/^10\.\d{4,9}\//i.test(term)?'doi':'query',requestId:crypto.randomUUID()});
+        if(destroyed||bound!==serviceEpoch||project!==projectId)return;
+        await refreshSources();
+        if(destroyed||bound!==serviceEpoch||project!==projectId)return;
+        if(result.saved?.length){query='';searchInput.value='';filter='documents';filterSelect.value=filter;selectedId=result.saved[0].sourceId;renderCollection();}
+        showNotice((result.saved?.length||0)+' paper editions saved.'+(result.error?' Crossref: '+result.error:''));
+      }catch(e){if(bound===serviceEpoch&&project===projectId)showNotice(e.message,'warning');}
+      finally{searchingPapers=false;findPapers.disabled=false;}
+    });
     function refreshStorageNote() {
+      findPapers.hidden=!service?.canSearch?.(projectId);
       storageNote.textContent = service ? 'Project file storage is connected. Each source shows whether its original was stored. Extraction and review are separate steps.' : storageMode === 'local' ? 'Files stay in this session. Notes and pins are saved for this project on this device. Original-file storage and PDF extraction are not connected.' : 'Storage is unavailable. Project files, notes, and pins stay in this session. Original-file storage and PDF extraction are not connected.';
+      if(service?.listSources&&service?.searchAndSave)storageNote.textContent='Research papers are saved in the project’s Athena Library folder and can be cited across its conversations.';
       q('[data-akn-project]').textContent = 'Project · ' + projectId;
     }
     function persist() {
@@ -9915,8 +10320,8 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         ${isPdf ? '<div class="akn-pdf-note">' + icon('info') + '<p>' + (source.extraction.status === 'ready' ? 'Extracted text is available for this version. PDF preview and extraction do not establish that its contents are correct or reviewed.' : service ? 'Native PDF preview only. Extraction status: ' + escape(source.extraction.status.replaceAll('_', ' ')) + '. Previewing a file does not read or understand its contents.' : 'Native PDF preview only. Text extraction, OCR, and indexing are not available. Previewing a file does not read or understand its contents.') + '</p></div><div class="akn-pdf-preview"></div>' + (source.text ? '<div class="akn-preview-heading"><h4>Extracted text</h4><span>Review: ' + escape(source.review.status.replaceAll('_', ' ')) + '</span></div><pre class="akn-text-preview" tabindex="0">' + escape(previewText) + '</pre>' + (source.text.length > 16000 ? '<p class="akn-truncated">Showing the first 16,000 characters. Search includes the full extracted text.</p>' : '') : '') : '<div class="akn-preview-heading"><h4>' + (source.format === 'CSV' ? 'CSV preview' : 'Text preview') + '</h4><span>Plain text</span></div><pre class="akn-text-preview" tabindex="0">' + escape(previewText) + '</pre>' + (source.text && source.text.length > 16000 ? '<p class="akn-truncated">Showing the first 16,000 characters. Search includes the full text.</p>' : '')}
         <div class="akn-source-actions"><button type="button" class="akn-button akn-primary cursor-interaction" data-akn-action="use-source">${icon('corner-down-left')}${!source.text ? 'Use file details in chat' : 'Use excerpt in chat'}</button>${source.artifactId && typeof options.onOpenArtifact === 'function' ? '<button type="button" class="akn-button cursor-interaction" data-akn-action="open-artifact">' + icon('arrow-up-right') + 'Open example artifact</button>' : ''}</div>
         ${!source.text ? '' : '<p class="akn-excerpt-hint">Adds up to 1,600 characters to the composer for your review. The exact source and version stay attached as metadata.</p>'}
-        ${!source.isSample ? '<div class="akn-service-actions"><button type="button" class="akn-button cursor-interaction" data-akn-action="store-original" ' + (!serviceAvailable('storeSource') || source.persistence === 'host' || sourceOperations.has(source.id) ? 'disabled' : '') + '>' + icon('hard-drive-upload') + (source.persistence === 'host' ? 'Original stored' : 'Store original') + '</button>' + (isPdf ? '<button type="button" class="akn-button cursor-interaction" data-akn-action="extract-text" ' + (!serviceAvailable('extractSource') || source.persistence !== 'host' || sourceOperations.has(source.id) || ['queued', 'extracting'].includes(source.extraction.status) ? 'disabled' : '') + '>' + icon('text-search') + 'Extract text</button>' : '') + '</div><p class="akn-service-note">' + (service ? 'Storage, extraction, and review require separate confirmations from the project service.' : 'Connect project storage to preserve original files beyond this session.') + '</p>' : ''}
-        ${source.isSample ? '' : '<button type="button" class="akn-remove-button cursor-interaction" data-akn-action="remove">' + icon('trash-2') + 'Remove source</button>'}`;
+        ${source.paperCoverage ? '<p class="akn-service-note">'+escape(source.paperCoverage)+' · '+escape(source.originalLocation.label)+'</p>'+(source.paperDetail?'<p>'+escape(source.paperDetail)+'</p>':'')+(source.originalUri?'<a class="akn-button" href="'+escape(source.originalUri)+'" download>Download original</a>':'') : !source.isSample ? '<div class="akn-service-actions"><button type="button" class="akn-button cursor-interaction" data-akn-action="store-original" ' + (!serviceAvailable('storeSource') || source.persistence === 'host' || sourceOperations.has(source.id) ? 'disabled' : '') + '>' + icon('hard-drive-upload') + (source.persistence === 'host' ? 'Original stored' : 'Store original') + '</button>' + (isPdf ? '<button type="button" class="akn-button cursor-interaction" data-akn-action="extract-text" ' + (!serviceAvailable('extractSource') || source.persistence !== 'host' || sourceOperations.has(source.id) || ['queued', 'extracting'].includes(source.extraction.status) ? 'disabled' : '') + '>' + icon('text-search') + 'Extract text</button>' : '') + '</div><p class="akn-service-note">' + (service ? 'Storage, extraction, and review require separate confirmations from the project service.' : 'Connect project storage to preserve original files beyond this session.') + '</p>' : ''}
+        ${source.isSample || source.paperCoverage ? '' : '<button type="button" class="akn-remove-button cursor-interaction" data-akn-action="remove">' + icon('trash-2') + 'Remove source</button>'}`;
       if (isPdf) {
         const container = detail.querySelector('.akn-pdf-preview');
         const url = fileVersions.get(source.id) === source.sourceVersion ? blobUrls.get(source.id) : null;
@@ -10046,19 +10451,26 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       const validExtraction = ['not_requested', 'queued', 'extracting', 'ready', 'failed', 'unsupported'].includes(value.extraction?.status) && String(value.extraction.version) === version;
       const validReview = ['unreviewed', 'in_review', 'approved', 'changes_requested'].includes(value.review?.status) && String(value.review.version) === version;
       if (value.extraction?.status === 'ready' && (!validExtraction || typeof value.text !== 'string')) throw new Error('Extraction was reported as ready without text for this source version.');
-      return sourceDefaults({ id: value.sourceId, title: value.title, text: typeof value.text === 'string' ? value.text : '', kind: value.kind, format: String(value.format || 'TEXT').toUpperCase(), origin: 'host', isSample: false, sessionOnly: false, pinned: false, size: value.size || null, createdAt: value.createdAt || '', order: -Date.now(), sourceVersion: version, originalLocation: { ...value.originalLocation }, persistence: 'host', extraction: validExtraction ? { ...value.extraction } : { status: 'not_requested', version }, review: validReview ? { ...value.review } : { status: 'unreviewed', version } }, expectedProject);
+      return sourceDefaults({ id: value.sourceId, title: value.title, text: typeof value.text === 'string' ? value.text : '', kind: value.kind, format: String(value.format || 'TEXT').toUpperCase(), origin: 'host', isSample: false, sessionOnly: false, pinned: false, size: value.size || null, createdAt: value.createdAt || '', order: -Date.now(), sourceVersion: version, originalLocation: { ...value.originalLocation }, persistence: 'host', paperCoverage:value.coverage, paperDetail:value.detail, originalFile:value.originalFile, originalUri: /^\/api\/artifacts\/[\w-]+\/library-[a-f0-9]{64}$/.test(value.originalUri || '') ? value.originalUri : null, extraction: validExtraction ? { ...value.extraction } : { status: 'not_requested', version }, review: validReview ? { ...value.review } : { status: 'unreviewed', version } }, expectedProject);
     }
-    function mergeHostSource(value, expectedId = null) {
+    function mergeHostSource(value, expectedId = null, render = true) {
       const next = checkedHostSource(value, projectId, expectedId), existing = sources.find(item => item.id === next.id);
+      if (existing && existing.sourceVersion === next.sourceVersion) {
+        next.pinned = existing.pinned;
+      } else {
+        try { next.pinned = window.localStorage.getItem(editionPinKey(next)) === '1'; }
+        catch (_) { /* Storage may be unavailable in this window. */ }
+      }
       if (!existing) sources.push(next);
       else {
         const versions = existing.versions;
         if (existing.sourceVersion !== next.sourceVersion && !versions.some(version => version.sourceVersion === existing.sourceVersion)) {
           const previous = { ...existing, originalLocation: { ...existing.originalLocation }, extraction: { ...existing.extraction }, review: { ...existing.review } }; delete previous.versions; versions.push(previous);
         }
-        Object.assign(existing, next, { pinned: existing.pinned, origin: existing.origin, order: existing.order, versions });
+        Object.assign(existing, next, { origin: existing.origin, order: existing.order, versions });
       }
-      renderCollection(); refreshStorageNote(); return next;
+      if (render) { renderCollection(); refreshStorageNote(); }
+      return next;
     }
     async function refreshSources() {
       if (!serviceAvailable('listSources') || destroyed) return false;
@@ -10068,8 +10480,8 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         if (destroyed || bound !== serviceEpoch || scope !== projectEpoch || target !== service || project !== projectId) return false;
         if (!Array.isArray(result?.sources)) throw new Error('The source service did not return a project source list.');
         result.sources.forEach(value => checkedHostSource(value, project));
-        result.sources.forEach(value => mergeHostSource(value));
-        renderCollection(); return true;
+        result.sources.forEach(value => mergeHostSource(value, null, false));
+        refreshStorageNote(); renderCollection(); return true;
       } catch (error) {
         if (!destroyed && bound === serviceEpoch && scope === projectEpoch) showNotice(String(error?.message || error), 'warning');
         return false;
@@ -10189,10 +10601,22 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       if (action === 'reset-filters') { restoreFullList(); renderCollection(); searchInput.focus({ preventScroll: true }); }
       if (action === 'pin' && source) {
         source.pinned = !source.pinned;
-        persist();
+        let sessionOnly = false;
+        if (source.origin !== 'host') {
+          // A promoted device note is restored before its host edition arrives.
+          persist();
+          sessionOnly = storageMode === 'session';
+        }
+        if (source.persistence === 'host') {
+          try {
+            const key = editionPinKey(source);
+            if (source.pinned) window.localStorage.setItem(key, '1');
+            else window.localStorage.removeItem(key);
+          } catch (_) { sessionOnly = true; }
+        }
         renderCollection();
         (detail.querySelector('[data-akn-action="pin"]') || pinnedFilter).focus({ preventScroll: true });
-        if (storageMode === 'session') showNotice('Pin changes are kept for this session because persistent storage is unavailable.');
+        if (sessionOnly) showNotice('Pin changes are kept for this session because persistent storage is unavailable.');
       }
       if (action === 'use-source' && source) {
         if (typeof options.onUseSource === 'function') {
@@ -10221,6 +10645,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
     const api = {
       open(settings = {}) {
         if (destroyed) return;
+        refreshStorageNote();if(service?.searchAndSave)void refreshSources();
         if (settings && typeof settings === 'object') {
           if (typeof settings.query === 'string') { query = settings.query; searchInput.value = query; }
           if (typeof settings.sourceId === 'string' && sources.some(source => source.id === settings.sourceId)) {
@@ -10334,7 +10759,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       if (element.matches?.('[data-aw-diagnostics] > summary')) return { attribute: 'data-aw-diagnostics', value: element.parentElement.dataset.awDiagnostics, summary: true };
       if (element.dataset?.awToolAction) return { attribute: 'data-aw-tool-action', value: element.dataset.awToolAction, tool: element.dataset.awTool };
       if (element.dataset?.awOutputMode) return { attribute: 'data-aw-output-mode', value: element.dataset.awOutputMode, tool: element.dataset.awTool };
-      for (const attribute of ['id', 'data-aw-copy-fallback', 'data-aw-agent-reveal', 'data-aw-approval-open', 'data-aw-summary', 'data-aw-tool-summary', 'data-aw-process-summary', 'data-aw-thinking-summary', 'data-aw-action', 'data-aw-retry', 'data-aw-task-details', 'data-awv-focus', 'data-awv-action']) {
+      for (const attribute of ['id', 'data-aw-copy-fallback', 'data-aw-agent-reveal', 'data-aw-approval-open', 'data-aw-attempt-summary', 'data-aw-tool-summary', 'data-aw-summary', 'data-aw-process-summary', 'data-aw-thinking-summary', 'data-aw-action', 'data-aw-retry', 'data-aw-task-details', 'data-awv-focus', 'data-awv-action']) {
         const value = element.getAttribute?.(attribute);
         if (value != null) return { attribute, value };
       }
@@ -10405,10 +10830,9 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
     function toolEventHTML(tool, state, agent = null) {
       const task = state.tasks.find(item => item.id === tool.taskId) || (state.mode === 'runtime' ? { id: null, title: 'Session tool', status: tool.status } : null);
       if (!task) return '';
-      const latest = tool.logs[tool.logs.length - 1];
-      const open = expandedTools.has(tool.id) || (agent && expanded.has(agent.id));
+      const open = expandedTools.has(tool.id);
       const identity = agent ? 'data-aw-agent="' + esc(agent.id) + '"' : 'data-aw-pending-tool="' + esc(tool.id) + '"';
-      const summaryKey = agent ? 'data-aw-summary="' + esc(agent.id) + '"' : 'data-aw-tool-summary="' + esc(tool.id) + '"';
+      const summaryKey = 'data-aw-tool-summary="' + esc(tool.id) + '"' + (agent ? ' data-aw-summary="' + esc(agent.id) + '"' : '');
       // A retry changes the task's current attempt, not the recorded tool outcome.
       // A successful worker process can still be followed by a failed tool wrapper.
       const activityStatus = state.mode === 'runtime' ? tool.status : task.status;
@@ -10416,8 +10840,10 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       const glyph = window.AthenaPiActivity.iconHTML(presentation.icon, { active: presentation.active });
       const owner = agent ? labels.agent(agent, state.tasks) : '';
       const status = LABELS[activityStatus] || displayText(activityStatus, 'Working', state);
-      const summary = latest && displayText(latest.text, [owner, status].filter(Boolean).join(' · '), state);
-      return '<details class="aw-agent-event" ' + identity + ' data-aw-event-tool="' + esc(tool.id) + '" data-pi-tool="' + esc(tool.sdkToolName || 'custom') + '"' + (open ? ' open' : '') + '><summary class="cursor-interaction" ' + summaryKey + '>' + glyph + '<span class="aw-agent-copy"><span class="aw-agent-name">' + esc(presentation.label) + '<span class="aw-agent-owner">' + (owner ? ' · ' + esc(owner) : '') + '</span><span class="aw-status" data-status="' + esc(activityStatus) + '">' + esc(status) + '</span></span><span class="aw-tool-target">' + esc(presentation.detail) + '</span>' + (latest ? '<span class="aw-tool-activity" data-aw-progress="' + esc(tool.id) + '">' + esc(summary) + '</span>' : '') + '</span>' + icon('chevron-down') + '</summary>' + toolDetailsHTML(tool, task, state) + '</details>';
+      return '<details class="aw-agent-event" ' + identity + ' data-aw-event-tool="' + esc(tool.id) + '" data-pi-tool="' + esc(tool.sdkToolName || 'custom') + '"' + (open ? ' open' : '') + '><summary class="cursor-interaction" ' + summaryKey + '>' + glyph
+        + '<span class="aw-agent-copy"><span class="aw-agent-name">' + esc(presentation.label) + '</span><span class="aw-tool-target">' + esc(presentation.detail) + '</span></span>'
+        + '<span class="aw-status" data-status="' + esc(activityStatus) + '">' + esc(status) + '</span>' + icon('chevron-down') + '</summary>'
+        + (owner ? '<p class="aw-attempt-meta">' + esc(owner) + '</p>' : '') + toolDetailsHTML(tool, task, state) + '</details>';
     }
 
     function agentGroupHTML(state) {
@@ -10451,6 +10877,10 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         expandedProcesses.add(process.id); thinkingOpen = true; renderSignature = ''; render(snapshot);
         const row = [...all('[data-aw-process]')].find(item => item.dataset.awProcess === process.id);
         if (!row) return false;
+        const attempt = row.closest('[data-aw-attempt]');
+        if (attempt) attempt.open = true;
+        const group = row?.closest('.ac-stream-activity');
+        if (group) group.open = true;
         row.open = true;
         row.querySelector('summary').focus({ preventScroll: true });
         row.scrollIntoView?.({ block: 'nearest' });
@@ -10464,6 +10894,10 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       if (agent) expanded.add(agent.id);
       renderSignature = ''; render(snapshot);
       const row = Array.from(all('[data-aw-event-tool]')).find(item => item.dataset.awEventTool === tool.id);
+      const attempt = row?.closest('[data-aw-attempt]');
+      if (attempt) attempt.open = true;
+      const group = row?.closest('.ac-stream-activity');
+      if (group) group.open = true;
       const summary = row?.querySelector('summary');
       if (focusable(summary)) { summary.focus({ preventScroll: true }); summary.scrollIntoView?.({ block: 'nearest', behavior: 'auto' }); }
       return true;
@@ -10534,7 +10968,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         const results = state.artifacts.filter(item => item.attemptId === attempt.id);
         const agent = state.agents.find(item => item.taskId === task.id);
         let node = attemptSections.get(attempt.id);
-        if (!node) { node = document.createElement('section'); node.className = 'aw-attempt'; node.dataset.awAttempt = attempt.id; attemptSections.set(attempt.id, node); }
+        if (!node) { node = document.createElement('details'); node.className = 'aw-attempt'; node.dataset.awAttempt = attempt.id; attemptSections.set(attempt.id, node); }
         kept.add(attempt.id);
         const ownStatus = LABELS[attempt.status] || displayText(attempt.status, 'Waiting', state);
         const attemptLabel = labels.attempt(attempt.id, { ...task, attempts: attempts.filter(item => item.taskId === task.id) });
@@ -10543,7 +10977,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         const observed = [...tools.map((tool, index) => ({ at: state.events.find(event => event.toolId === tool.id)?.at ?? tool.logs?.[0]?.at ?? Infinity, index, html: toolEventHTML(tool, state, agent) })), ...processes.map((process, index) => ({ at: process.job?.startedAt ?? state.events.find(event => event.processId === process.id)?.at ?? Infinity, index: tools.length + index, html: processHTML(process) }))].sort((a, b) => a.at - b.at || a.index - b.index);
         const summary = attempt.result ? displayText(attempt.result, '', state) : '';
         const resultButtons = results.map(item => '<button type="button" class="aw-text-button cursor-interaction" data-aw-artifact="' + esc(item.id) + '" data-aw-artifact-version="' + esc(item.version || '') + '">' + icon('file-check') + esc(displayText(item.title || item.file?.name, 'View result', state)) + '</button>').join('');
-        node.innerHTML = '<header class="aw-attempt-heading"><strong>' + esc(labels.task(task, state.tasks)) + '</strong><span class="aw-status" data-status="' + esc(attempt.status) + '">' + esc(ownStatus) + '</span></header>'
+        node.innerHTML = '<summary class="aw-attempt-heading cursor-interaction" data-aw-attempt-summary="' + esc(attempt.id) + '">' + icon('users-round') + '<strong>' + esc(labels.task(task, state.tasks)) + '</strong><span class="aw-status" data-status="' + esc(attempt.status) + '">' + esc(ownStatus) + '</span>' + icon('chevron-down') + '</summary>'
           + '<p class="aw-attempt-meta">' + esc([agent ? labels.agent(agent, state.tasks) : 'Subagent', attemptLabel].join(' · ')) + '</p>'
           + '<div class="aw-agent-events">' + observed.map(item => item.html).join('') + '</div>'
           + (summary && summary.length <= 300 ? '<p class="aw-attempt-result">' + esc(summary) + '</p>' : '')
@@ -10829,7 +11263,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       rows.clear(); lastSnapshot = null; error.textContent = ''; error.hidden = true; if (!options.managedLayout) host.hidden = true;
     }
     reset();
-    return Object.freeze({ render, refresh() { if (lastSnapshot) render(lastSnapshot); }, reset, getToolElement: id => rows.get(id)?.element || null, revealTool(id) { const row = [...rows.values()].find(item => item.tool?.toolCallId === id || item.tool?.id === id); if (!row) return false; row.element.open = true; row.element.querySelector('summary').focus({preventScroll:true}); row.element.scrollIntoView?.({block:'nearest'}); return true; }, destroy() { if (destroyed) return; destroyed = true; controller.abort(); reset(); error.remove(); } });
+    return Object.freeze({ render, refresh() { if (lastSnapshot) render(lastSnapshot); }, reset, getToolElement: id => rows.get(id)?.element || null, revealTool(id) { const row = [...rows.values()].find(item => item.tool?.toolCallId === id || item.tool?.id === id); if (!row) return false; const group = row.element.closest('.ac-stream-activity'); if (group) group.open = true; row.element.open = true; row.element.querySelector('summary').focus({preventScroll:true}); row.element.scrollIntoView?.({block:'nearest'}); return true; }, destroy() { if (destroyed) return; destroyed = true; controller.abort(); reset(); error.remove(); } });
   }
   window.AthenaPiSessionView = Object.freeze({ mount });
 })();
@@ -10861,10 +11295,15 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       }
     }
     function makeNode(entry) {
-      const article = document.createElement(entry.kind === 'tool' ? 'div' : 'article');
+      const article = document.createElement(entry.kind === 'handoff' ? 'details' : entry.kind === 'tool' ? 'div' : 'article');
       article.className = entry.kind === 'tool' ? 'ac-stream-tool' : 'ac-pi-history-message ac-stream-message';
       article.dataset.streamKey = entry.key;
-      if (entry.kind !== 'tool') {
+      if (entry.kind === 'handoff') {
+        article.className = 'ac-stream-handoff';
+        const label = document.createElement('summary'); label.className = 'cursor-interaction'; label.textContent = 'Manuscript instructions';
+        const body = document.createElement('p'); body.className = 'ac-stream-text';
+        article.append(label, body);
+      } else if (entry.kind !== 'tool') {
         article.dataset.role = entry.role;
         const label = document.createElement('strong'); label.textContent = entry.role === 'user' ? 'You' : 'Athena';
         const body = document.createElement('p'); body.className = 'ac-stream-text';
@@ -10884,6 +11323,50 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         return { ...tool, status, active: status === 'running', taskId: recorded.taskId, sessionId: recorded.sessionId };
       });
     }
+    const groups = new Map();
+    function arrange(parent, children) {
+      let cursor = parent.firstElementChild;
+      for (const node of children) {
+        if (node === cursor) cursor = cursor.nextElementSibling;
+        else parent.insertBefore(node, cursor);
+      }
+    }
+    function activityBlocks(ordered) {
+      const visible = [], kept = new Set();
+      let block = null;
+      for (const item of ordered) {
+        if (!item.activity && !['tool', 'handoff'].includes(item.entry.kind)) {
+          visible.push(item.node); block = null; continue;
+        }
+        const run = item.activity?.runId || item.entry?.athena?.runId || '';
+        if (!block || block.run !== run) {
+          const anchor = item.activity?.attemptId || item.activity?.key || item.entry?.toolId || item.entry?.athena?.attemptId || item.entry?.key;
+          const key = JSON.stringify([run, anchor]);
+          block = groups.get(key);
+          if (!block) {
+            const node = document.createElement('details'), summary = document.createElement('summary'), body = document.createElement('div');
+            node.className = 'ac-stream-activity'; summary.className = 'cursor-interaction';
+            body.className = 'ac-stream-steps'; node.append(summary, body);
+            block = { node, summary, body, run };
+            groups.set(key, block);
+          }
+          kept.add(key); visible.push(block.node);
+          block.children = []; block.statuses = [];
+        }
+        block.children.push(item.node);
+        block.statuses.push(item.activity ? item.node.querySelector('.aw-attempt-heading [data-status]')?.dataset.status : item.node.querySelector('[data-pi-status]')?.dataset.piStatus);
+      }
+      for (const [key, group] of groups) {
+        if (!kept.has(key)) { group.node.remove(); groups.delete(key); continue; }
+        arrange(group.body, group.children);
+        const state = group.statuses.includes('failed') ? 'Needs attention' : group.statuses.includes('blocked') ? 'Waiting for input'
+          : group.statuses.includes('running') ? 'Working' : group.statuses.some(s => ['stopped','cancelled'].includes(s)) ? 'Stopped' : '';
+        const count = group.children.length;
+        const label = ['Research activity', count + (count === 1 ? ' step' : ' steps'), state].filter(Boolean).join(' · ');
+        if (group.summary.textContent !== label) group.summary.textContent = label;
+      }
+      return visible;
+    }
     function layout() {
       if (destroyed) return;
       const arranged = entries.filter(entry => entry.kind === 'tool' || entry.text !== '' || entry.attachments?.length).map(entry => ({ entry, node: nodes.get(entry.key) })).filter(item => item.node);
@@ -10900,11 +11383,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         while (index < arranged.length && arranged[index].activity && arranged[index].activity.runId === item.runId && (arranged[index].activity.at ?? Infinity) <= (item.at ?? Infinity)) index++;
         arranged.splice(index, 0, { node: item.node, activity: item });
       }
-      let cursor = host.firstElementChild;
-      for (const item of arranged) {
-        if (item.node === cursor) cursor = cursor.nextElementSibling;
-        else host.insertBefore(item.node, cursor);
-      }
+      arrange(host, activityBlocks(arranged));
       host.hidden = !arranged.length && !error;
     }
     function withLayout(change) {
@@ -10946,7 +11425,10 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       generation++; entries = []; tools.clear(); pendingUser = null; liveOwner = null; liveKeys.clear(); lastObservedOrder = 0; error = null;
       for (const node of nodes.values()) node.remove();
       nodes.clear();
-      if (!keepActivities) { for (const item of activities.values()) item.node.remove(); activities.clear(); }
+      if (!keepActivities) {
+        for (const group of groups.values()) group.node.remove();
+        groups.clear();
+        for (const item of activities.values()) item.node.remove(); activities.clear(); }
       view.reset(); host.hidden = true;
     }
     function history(messages) {
@@ -10957,6 +11439,18 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       return withLayout(() => restoreHistory(messages));
     }
     function restoreHistory(messages) {
+      // The live feed and the durable transcript share host-owned call IDs.
+      // Keep a reader's place when a settled run replaces its streaming rows.
+      const expanded = new Map();
+      for (const entry of entries) {
+        if (entry.kind !== 'tool' || !entry.athena) continue;
+        const row = view.getToolElement(entry.toolId);
+        if (!row?.open) continue;
+        const diagnostic = row.querySelector('[data-aw-diagnostics]');
+        expanded.set(entry.toolId, { attempt: entry.athena.attemptId, diagnostic: diagnostic.open,
+          focused: document.activeElement === row.querySelector('summary') ? 'summary' :
+            document.activeElement === diagnostic.querySelector('summary') ? '[data-aw-diagnostics] > summary' : null });
+      }
       clear(true);
       for (const [index, message] of (messages || []).entries()) {
         const owner = context(message.athena), at = timestamp(message.timestamp);
@@ -10967,7 +11461,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         }
         if (!['user', 'assistant'].includes(message.role)) continue;
         if (message.role === 'user') {
-          entries.push({ key: 'history:' + index, kind: 'message', role: 'user', text: text(message.content), attachments: attachmentNames(message.attachments), athena: owner, at });
+          entries.push({ key: 'history:' + index, kind: owner && message.manuscriptHandoff === true ? 'handoff' : 'message', role: 'user', text: text(message.content), attachments: attachmentNames(message.attachments), athena: owner, at });
           continue;
         }
         const content = typeof message.content === 'string' ? [{ type: 'text', text: message.content }] : message.content || [];
@@ -10980,6 +11474,14 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         }
       }
       render();
+      for (const entry of entries) {
+        const saved = expanded.get(entry.toolId);
+        if (!saved || saved.attempt !== entry.athena?.attemptId) continue;
+        const row = view.getToolElement(entry.toolId);
+        row.open = true;
+        row.querySelector('[data-aw-diagnostics]').open = saved.diagnostic;
+        if (saved.focused) row.querySelector(saved.focused).focus({preventScroll:true});
+      }
     }
     function finish() { generation++; pendingUser = null; liveOwner = null; liveKeys.clear(); lastObservedOrder = 0; error = null; }
     function beginUser(value, attachments = []) {
@@ -10994,8 +11496,9 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
         if (pendingUser && !pendingUser.athena) pendingUser.athena = owner;
       }
       if (event.type === 'message_start' && event.message?.role === 'user') {
-        if (!pendingUser || pendingUser.observed) {
-          pendingUser = { key: 'user:' + generation + ':' + (++userCounter), kind: 'message', role: 'user', text: '', athena: owner, at: null, order: lastObservedOrder + 0.5 };
+        const handoff = owner && event.message.manuscriptHandoff === true;
+        if (!pendingUser || pendingUser.observed || handoff) {
+          pendingUser = { key: 'user:' + generation + ':' + (++userCounter), kind: handoff ? 'handoff' : 'message', role: 'user', text: '', athena: owner, at: null, order: lastObservedOrder + 0.5 };
           entries.push(pendingUser); liveKeys.add(pendingUser.key);
         }
         pendingUser.observed = true;
@@ -11706,7 +12209,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
               <div class="ast-workspace-illustration" aria-hidden="true"><span class="ast-mini-sidebar"></span><span class="ast-mini-chat"><i></i><i></i><i></i><b></b></span><span class="ast-mini-panel"></span></div>
               <p class="ast-workspace-caption">Drag a panel edge to adjust its width. Double-click the edge to reset it.</p>
             </section>
-            <section class="ast-panel" tabindex="0" id="ast-panel-models" role="tabpanel" aria-labelledby="ast-tab-models" hidden><div id="ast-model-settings-slot"></div><div id="ast-provider-profiles-slot"></div></section>
+            <section class="ast-panel" tabindex="0" id="ast-panel-models" role="tabpanel" aria-labelledby="ast-tab-models" hidden><div id="ast-worker-models-slot"></div><div id="ast-model-settings-slot"></div><div id="ast-provider-profiles-slot"></div></section>
             <section class="ast-panel" tabindex="0" id="ast-panel-pi" role="tabpanel" aria-labelledby="ast-tab-pi" hidden><div id="ast-pi-workbench-slot"></div></section>
             <section class="ast-panel" tabindex="0" id="ast-panel-connections" role="tabpanel" aria-labelledby="ast-tab-connections" hidden>
               <div class="ast-section-heading"><h2>Connections</h2><p>Tools and skills available in the composer.</p></div>
@@ -11815,7 +12318,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       const mode = section === 'appearance' ? (sessionOnly ? 'session' : 'automatic') : (section === 'models' || section === 'execution' && !window.AthenaHosted) ? 'explicit' : 'host';
       q('.ast-footer').dataset.saveMode = mode;
       const messages = {
-        models: 'Model changes require Save settings. Connection checks are separate.',
+        models: window.AthenaHosted ? 'Worker assignments save when selected and apply to the next run.' : 'Model changes require Save settings. Connection checks are separate.',
         execution: window.AthenaHosted ? 'The host controls execution policy for this project.' : 'Role preferences require Save settings. Runtime controls apply to the current session.',
         tools: 'Package changes apply to new runs. Tool controls reflect the current runtime.',
         files: 'Files and history are stored only when the project host confirms the write.',
@@ -12876,7 +13379,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
     const profileById = id => id && profilesList ? array(profilesList.profiles).find(item => item.id === id) || null : null;
     const currentProfile = () => profilesAdapter && profilesList ? profileById(profileContext?.profileId)
       || profileById(profileContext?.projectDefaultProfileId) || profileById(profilesList.appDefaultProfileId) : null;
-    const profileGated = kind => options.isSessionBound?.() === false || !profileContext?.sessionId || activeWork() || changing() || kind === 'reasoning' && levelsLoading;
+    const profileGated = kind => options.isSessionBound?.() === false || !profileContext?.sessionId || (!profileContext.researchWorkflow&&activeWork()) || changing() || kind === 'reasoning' && levelsLoading;
 
     function position() {
       if (!open || destroyed) return;
@@ -12905,10 +13408,15 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       if (profilesAdapter) {
         const profile = currentProfile();
         const host = profilesList?.hostModel;
-        const name = !bound ? 'Connect session' : profile?.name || (host ? [host.name || host.modelId || host.id, host.provider].filter(Boolean).join(' · ') : 'Choose model');
+        const name = !profileContext?.sessionId ? 'No conversation' : !bound ? 'Connect session' : profile?.name || (host ? [host.name || host.modelId || host.id, host.provider].filter(Boolean).join(' · ') : 'Choose model');
         modelLabel.textContent = name;
         modelTrigger.setAttribute('aria-label', 'Choose model' + (name !== 'Choose model' ? ': ' + name : ''));
-        modelTrigger.title = profile ? [profile.name, profile.provider, profile.modelId].filter(Boolean).join(' · ') : name;
+        modelTrigger.title = profile ? [profileContext?.profileId?'Conversation':profileContext?.projectDefaultProfileId?'Inherited from project':'Inherited from app',profile.name, profile.provider, profile.modelId].filter(Boolean).join(' · ') : name;
+        const account=profile?.authMode==='chatgpt'&&profilesList?.accountStates?.find(a=>a.authRef===profile.authRef);
+        if(profile?.authMode==='chatgpt'&&profilesList?.accountStates&&(!account||account.state!=='connected'||account.planUsage!=='enabled')){
+          modelLabel.textContent=name+' · '+(account?.state==='connected'?'Enable plan usage':'Sign in');
+          modelTrigger.title=modelLabel.textContent;
+        }
         const level = profile?.thinkingLevel;
         reasoningLabel.textContent = level ? 'Reasoning · ' + levelInfo(level)[0] : 'Reasoning';
         reasoningTrigger.setAttribute('aria-label', 'Choose reasoning level' + (level ? ': ' + levelInfo(level)[0] : ''));
@@ -12970,7 +13478,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
       }
       q('.acmp-refresh').setAttribute('aria-label', open === 'model' ? 'Refresh available models' : 'Refresh reasoning levels');
       errorNode.textContent = error; errorNode.hidden = !error;
-      const reason = changing() ? 'Applying your selection…' : activeWork() ? 'You can change these after the current reply finishes.' : open === 'reasoning' && snapshot.thinkingLevelsPending ? 'Checking this model’s reasoning levels…' : loading ? 'Refreshing available choices…' : '';
+      const reason = changing() ? 'Applying your selection…' : activeWork() ? profileContext?.researchWorkflow?'Changes apply to the next research request.':'You can change these after the current reply finishes.' : open === 'reasoning' && snapshot.thinkingLevelsPending ? 'Checking this model’s reasoning levels…' : loading ? 'Refreshing available choices…' : '';
       notice.textContent = reason; notice.hidden = !reason;
       list.replaceChildren(); empty.hidden = true;
       if (profilesAdapter && !profileContext?.sessionId) {
@@ -12982,7 +13490,8 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
           const profiles = profilesList ? array(profilesList.profiles) : [];
           const terms = search.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
           const match = profile => terms.every(term => [profile.name, profile.id, profile.provider, profile.modelId].join(' ').toLocaleLowerCase().includes(term));
-          const fallback = profilesList?.appDefaultProfileId ? 'Falls back to ' + (profileById(profilesList.appDefaultProfileId)?.name || 'the app default profile') : 'No app default profile selected yet';
+          const projectProfile=profileById(profileContext?.projectDefaultProfileId);
+          const fallback = projectProfile ? 'Project · '+projectProfile.name+' · '+projectProfile.modelId : profilesList?.appDefaultProfileId ? 'Falls back to ' + (profileById(profilesList.appDefaultProfileId)?.name || 'the app default profile') : 'Host · '+(profilesList?.hostModel?.modelId||'No configured host model');
           addOption('inherit\u241f', 'Inherit default', fallback, 'circle-dashed', !profileContext?.profileId);
           const matches = profiles.filter(match);
           for (const profile of matches) {
@@ -13274,14 +13783,17 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
  let piRuntime=null,piWorkbench=null,piRuntimeSubscription=null,piEventSubscription=null,piManualView=null,piSessionIdentity='',piCommandSignature='',piWidgetSignature='',piHistorySignature='',piSubmitting=false,piDraftOffer='',piDraftSeen='',piTurnEpoch=0,piSubmittedContext=null;
  const piManualTools=new Map(), sessionDrafts=new Map();
  const failedDrafts=[];
- let paperPanel;
+ let paperPanel, researchFlow, shownResearchSession=null,currentResearchStage='';
  let projectSignature='', activeProjectId='project-rc', activeDocumentId='research-note', requestedDocumentVersion=null, lifecyclePending=false, nativeSessionTransition=null;
  const activityHome=q('#aw-activity').parentElement,activityBefore=q('#aw-activity').nextElementSibling;
  const piPreviewTimers=new Set();
  const WORKSPACE_VIEWS=['workflow','artifacts','timeline','knowledge'];
  let opener=null,dialogOpener=null,dialogAction=null,toastTimer=0,reconcileTimer=0;
  const listen=(el,type,fn,options={})=>el.addEventListener(type,fn,{...options,signal});
- const icons=()=>{if(window.lucide)window.lucide.createIcons({attrs:{'aria-hidden':'true'}})};
+ // Lucide copies data-lucide onto the SVG. Replacing those finished SVGs on
+ // every worker event makes a long conversation unresponsive.
+ const pendingIcons={querySelectorAll:selector=>root.querySelectorAll(selector+':not(svg)')};
+ const icons=()=>{if(window.lucide)window.lucide.createIcons({root:pendingIcons,attrs:{'aria-hidden':'true'}})};
  // Parent messages and host child snapshots can grow the same transcript in
  // separate callbacks. Capture before the first DOM mutation, not after a
  // child card has already grown. Nested renders share one scroll decision.
@@ -13484,7 +13996,12 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
    composer.restoreDraft(sessionDrafts.get(snapshot.sessionId||'preview')||{value:'',attachments:[],mentions:[]});
   }
   const live=snapshot.mode==='runtime';root.dataset.workspaceMode=snapshot.mode;root.dataset.sessionBound=String(snapshot.sessionBound!==false);
-  paperPanel?.scope(snapshot);
+  paperPanel?.scope(snapshot);researchFlow?.scope(snapshot);
+  const guided=snapshot.projects?.some(p=>p.id===snapshot.projectId&&p.researchWorkflow)&&!!snapshot.sessionId;
+  q('#ac-view-manuscript').dataset.guided=String(!!guided);
+  if(guided&&shownResearchSession!==snapshot.sessionId){
+    shownResearchSession=snapshot.sessionId;q('#ac-view-manuscript').dataset.editorOpen='false';openPanel('manuscript');
+  }
   if(live){q('#ac-doc-evidence').hidden=true;q('[data-action="export-manuscript"]').hidden=true;}
   surfaces?.setRuntimeMode?.(live);
   knowledge?.setRuntimeMode?.(live);
@@ -13499,7 +14016,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   modelSettings?.setModelScopes(m3Scopes||snapshot.modelScopes||{},{canEditProject:Boolean(snapshot.capabilities?.setProjectModel)});
   if(modelProfilesAdapter){
    const session=(snapshot.sessions||[]).find(item=>item.id===snapshot.sessionId),project=(snapshot.projects||[]).find(item=>item.id===snapshot.projectId);
-   chatModelPicker?.setProfileContext?.({sessionId:snapshot.sessionId||null,profileId:session?.profileId||null,projectId:snapshot.projectId||null,projectDefaultProfileId:project?.defaultProfileId||null,appDefaultProfileId:providerProfiles?.getAppDefaultProfileId()||null,hostModel:providerProfiles?.getHostModel()||null});
+   chatModelPicker?.setProfileContext?.({sessionId:snapshot.sessionId||null,researchWorkflow:!!project?.researchWorkflow,profileId:session?.profileId||null,projectId:snapshot.projectId||null,projectDefaultProfileId:project?.defaultProfileId||null,appDefaultProfileId:providerProfiles?.getAppDefaultProfileId()||null,hostModel:providerProfiles?.getHostModel()||null});
   }
   chatModelPicker?.sync();
   q('#ac-example-projects').hidden=live;q('#ac-live-projects').hidden=!live;
@@ -13510,7 +14027,13 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
    for(const project of snapshot.projects||[]){
     const group=document.createElement('details');group.open=project.id===snapshot.projectId;group.className='ac-live-project';
     const summary=document.createElement('summary');summary.className='ac-project-label cursor-interaction';summary.textContent=window.AthenaActivityLabels.text(project.name,'Untitled project',[project.id]);group.appendChild(summary);
+    if(project.folder){const info=document.createElement('small');info.textContent=[project.folder.path,project.folder.branch].filter(Boolean).join(' · ');info.className='ac-project-empty';group.append(info);}
+    if(project.id===snapshot.projectId){const stage=document.createElement('small');stage.id='ac-flow-stage';stage.textContent=currentResearchStage;stage.className='ac-project-empty';group.append(stage);}
     for(const session of (snapshot.sessions||[]).filter(item=>item.projectId===project.id)){const button=document.createElement('button');button.type='button';button.className='ac-thread-item cursor-interaction';button.dataset.openSession=session.id;button.textContent=window.AthenaActivityLabels.text(session.title,'New conversation',[session.id]);if(session.id===snapshot.sessionId)button.setAttribute('aria-current','page');button.disabled=!snapshot.capabilities?.openSession;group.appendChild(button);}
+    if(project.researchWorkflow&&!snapshot.sessions.some(s=>s.projectId===project.id)){
+      const first=document.createElement('button');first.type='button';first.className='ac-thread-item';first.textContent='Open first conversation';
+      first.onclick=async()=>{try{await createResearch('Research',project.id,true);}catch(e){first.textContent='Retry · '+e.message;}};group.append(first);
+    }
     list.appendChild(group);
    }
   }
@@ -13538,14 +14061,14 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   composer.restoreDraft(sessionDrafts.get(sessionId)||{value:'',attachments:[],mentions:[]});
   closeDialog();composer.focus();return result;
  }
- async function createResearch(title,projectId=workspaceStore.getState().projectId){
+ async function createResearch(title,projectId=workspaceStore.getState().projectId,firstForProject=false){
   if(lifecyclePending)return;
   if(!canCreateSession())throw new Error('Connect a session service or Pi session before creating a conversation.');
   if(state.busy||piSubmitting||piRuntime.getState().session.isStreaming)throw new Error('Wait for the current message operation to finish before creating a conversation.');
   lifecyclePending=true;rememberDraft();
   try{
    const workspace=workspaceStore.getState(),preferred=resolvedNewSessionModel(workspace,projectId);let result;
-   const input={projectId:workspace.mode==='runtime'?projectId:null,title,model:preferred,configurationId:connectionManager.getState().configurationId||undefined};
+   const input={...(firstForProject?{firstForProject}:{}),projectId:workspace.mode==='runtime'?projectId:null,title,model:preferred,configurationId:connectionManager.getState().configurationId||undefined};
    if(workspace.capabilities?.createSession)result=await workspaceStore.createSession(input);
    else if(connectionManager.getState().capabilities.createSession)result=await connectionManager.createSession(input);
    else{
@@ -13578,14 +14101,26 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
   try{activateSession(await workspaceStore.openSession(sessionId));}catch(error){toast(String(error.message||error));}finally{lifecyclePending=false;}
  }
  function requestProject(){
+  const requestId=crypto.randomUUID();let created=null;
   const enabled=Boolean(workspaceStore.getState().capabilities?.createProject);
-  dialog('New project','<p>Create a separate place for conversations, sources, and versioned documents.</p><label for="ac-project-name">Project name</label><input id="ac-project-name" aria-label="Project name" placeholder="Your research project"><p class="ac-small-note">'+(enabled?'The connected project service will store this project.':'Project storage is not connected. A project will be created only after the service confirms it.')+'</p><p data-lifecycle-error role="alert" hidden></p>','Create project',async()=>{
-   const name=q('#ac-project-name').value.trim();if(!name)return;
+  dialog('New project','<p>Create a separate place for conversations, sources, and versioned documents.</p><label for="ac-project-name">Project name</label><input id="ac-project-name" aria-label="Project name" placeholder="Your research project"><label for="ac-project-folder">Work folder or Git repository (optional)</label><input id="ac-project-folder" placeholder="Absolute local folder path"><button id="ac-choose-folder" type="button" hidden>Choose folder…</button><label class="ac-research-choice"><input type="checkbox" id="ac-research-mode" checked><span>Enable research, paper archiving and typesetting</span></label><p class="ac-small-note">'+(enabled?'The connected project service will store this project.':'Project storage is not connected. A project will be created only after the service confirms it.')+'</p><p data-lifecycle-error role="alert" hidden></p>','Create project',async()=>{
+   const input=q('#ac-project-name'),name=input.value.trim();
+   if(!name){const message=q('[data-lifecycle-error]');message.hidden=false;message.textContent='Enter a project name.';input.setAttribute('aria-invalid','true');input.focus();return;}
+   input.removeAttribute('aria-invalid');
    q('#ac-dialog-primary').disabled=true;
-   try{const result=await workspaceStore.createProject({name,defaultModel:connectionManager.getDefaultModel()});if(!result?.project?.id)throw new Error('Project creation was not confirmed.');closeDialog();toast('Project created: '+result.project.name);}
+   try{
+    if(!created){const result=await workspaceStore.createProject({name,requestId,folder:q('#ac-project-folder').value.trim(),researchWorkflow:q('#ac-research-mode').checked,defaultModel:connectionManager.getDefaultModel()});created=result?.project;}
+    if(!created?.id)throw new Error('Project creation was not confirmed.');
+    q('#ac-project-name').disabled=q('#ac-project-folder').disabled=q('#ac-research-mode').disabled=true;
+    q('#ac-dialog-primary').textContent='Retry opening conversation';
+    await createResearch('Research',created.id,true);
+    if(created.researchWorkflow)openPanel('manuscript');composer.focus();
+   }
    catch(error){const message=q('[data-lifecycle-error]');if(message){message.hidden=false;message.textContent=String(error.message||error);}}
    finally{q('#ac-dialog-primary').disabled=!enabled;}
   });q('#ac-dialog-primary').disabled=!enabled;q('#ac-project-name').focus();
+  const pick=q('#ac-choose-folder');pick.hidden=!window.AthenaFolderPicker;
+  pick.onclick=async()=>{try{const path=await window.AthenaFolderPicker();if(path)q('#ac-project-folder').value=path;}catch(e){const msg=q('[data-lifecycle-error]');msg.hidden=false;msg.textContent=e.message;}};
  }
  function requestResearch(){
   const workspace=workspaceStore.getState(),enabled=canCreateSession();
@@ -13810,6 +14345,7 @@ assert abs(gain_db(fc, R_OHM, C_FARAD) + 3.01029995664) < 1e-9
    piTurnEpoch++;preservePendingSubmission('The host changed conversations before acceptance.');resetPiActivity();piManualTools.clear();piManualView?.reset();q('#ac-live-user').hidden=true;piView?.clear?.();piHistorySignature='';piSessionIdentity='';return;
   }
   if(workspaceStore?.getState().sessionBound===false)return;
+  if(event.type==='manuscript_draft'){researchFlow?.receiveDraft(event);return;}
   if(event.type==='host_command_start'){
    const presentation=window.AthenaPiActivity.toolPresentation('bash',event.args,'queued');
    piManualTools.set(event.id,{...presentation,id:'manual:'+event.id,toolCallId:event.id,toolName:'bash',args:event.args,status:'queued',output:'',outputRevision:0,startedAt:Date.now()});
@@ -13960,7 +14496,7 @@ const dialogOpen=!q('#ac-dialog-backdrop').hidden;const rightOverlay=state.panel
  surfaces=window.AthenaSurfaces.mount(q('#ac-surface-slot'),{files,icons,toast,onResearch:tab=>openPanel(tab||'results'),onWorkspace:(view,selection)=>openWorkspace(view,selection),onAgents:()=>openWorkspace('timeline'),onClose:()=>closePanel()});
  workspaceViews=window.AthenaWorkspaceViews.mount(q('#ac-workbench-slot'),{store:workspaceStore,records,icons,toast,onNavigate:(view,selection)=>openWorkspace(view,selection),onApproval:openApproval});
  knowledge=window.AthenaKnowledge.mount(q('#ac-knowledge-slot'),{icons,toast,hosted,onUseSource(item){
-  const snippet='['+item.title+']\n'+String(item.excerpt||'');
+  const snippet='['+item.title+']'+(item.metadata?.persistence==='host'?' · sourceId '+item.id+' · version '+item.metadata.sourceVersion:'')+'\n'+String(item.excerpt||'');
   composer.setValue((composer.getValue().trim()?composer.getValue()+'\n\n':'')+snippet);
   closePanel(false);if(!q('#ac-conversation').inert)composer.focus();
   toast(item.title+' excerpt added to the draft.');
@@ -13978,8 +14514,8 @@ const dialogOpen=!q('#ac-dialog-backdrop').hidden;const rightOverlay=state.panel
   onOpen(){overlay();extensions?.refresh();announce('Settings opened.')},
   onClose(){overlay();announce('Settings closed.')}
  });
- extensions=window.AthenaExtensions?.mount(q('#ast-extensions-slot'),{icons,getWorkspace:()=>workspaceStore.getState(),onUseSkill(skill){
-  const request='Use the "'+skill.name+'" skill ('+skill.id+') for this task.';
+ extensions=window.AthenaExtensions?.mount(q('#ast-extensions-slot'),{icons,getWorkspace:()=>workspaceStore.getState(),onSkillsChange:skills=>composer.setProjectSkills?.(skills),onUseSkill(skill){
+  const request=skill.roles?.includes('parent')?'$'+skill.id+' ':'Use the "'+skill.name+'" skill ('+skill.id+') for this task.';
   composer.setValue((composer.getValue().trim()?composer.getValue()+'\n\n':'')+request);
   settings?.close(false);overlay();composer.focus();toast('Skill added to your draft. Send the request to use it.');
  }});
@@ -13992,6 +14528,7 @@ const dialogOpen=!q('#ac-dialog-backdrop').hidden;const rightOverlay=state.panel
  chatModelPicker=window.AthenaChatModelPicker.mount(q('#ac-model-picker-slot'),{runtime:piRuntime,preferences:modelConfig,icons,announce,isBusy:()=>state.busy||piSubmitting||lifecyclePending||Boolean(nativeSessionTransition),isSessionBound:()=>workspaceStore.getState().sessionBound!==false,isUnavailable:()=>q('#ac-conversation').inert,beforeOpen(){composer.closeMenu?.();command?.close?.(false)},onOpenSettings(){piSession?openPi('model'):openSettings('models')}});
  workspaceStore.configure?.({parallelLimit:modelConfig.parallelLimit});
  piWorkbench=window.AthenaPiWorkbench.mount(q('#ast-pi-workbench-slot'),{runtime:piRuntime,icons,toast,onDraft:usePiDraft,onSectionChange:section=>settings?.routeRuntime(section),onModalChange(){overlay()}});
+ researchFlow=window.AthenaResearchFlow?.mount(q('#ac-research-flow'),{open:openWorkspace,editor:async id=>{q('#ac-view-manuscript').dataset.editorOpen='true';await paperPanel?.select(id);q('#ac-paper-project').scrollIntoView({block:'start'});},stage:text=>{currentResearchStage=text;const e=q('#ac-flow-stage');if(e)e.textContent=text;}});
  paperPanel=window.AthenaManuscripts?.mount(q('#ac-paper-project'),{open:(documentId,version)=>openDocument({documentId,version}),cancel:id=>workspaceStore.cancel(id)});
  mountDocumentToolbar();
  recordsOff=records.subscribe(renderDocumentRecord);
@@ -14009,7 +14546,7 @@ const dialogOpen=!q('#ac-dialog-backdrop').hidden;const rightOverlay=state.panel
   enterHostedMode:()=>workspaceStore.enterHostedMode(),
   reportHostError:message=>toast(String(message)),
   attachConnectionManager:adapter=>connectionManager.attach(adapter),detachConnectionManager:()=>connectionManager.detach(),
-  attachPaperService:service=>{paperPanel?.attach(service);paperPanel?.scope(workspaceStore.getState());},
+  attachPaperService:service=>{researchFlow?.attach(service);researchFlow?.scope(workspaceStore.getState());paperPanel?.attach(service);paperPanel?.scope(workspaceStore.getState());},
   attachResearchService:adapter=>{records.attach(adapter.documents||adapter);knowledge.attachRecords(adapter.knowledge||adapter);return true;},detachResearchService:()=>{records.detach();knowledge.detachRecords();},
   loadDocument:(id,version)=>openDocument({documentId:id,version}),ensureDocument:document=>records.ensureDocument(document),
   createProject:input=>workspaceStore.createProject(input),createResearch,openResearchSession,setDemoMode:enabled=>workspaceStore.setDevelopment(enabled),
@@ -14019,7 +14556,7 @@ const dialogOpen=!q('#ac-dialog-backdrop').hidden;const rightOverlay=state.panel
   attachExtensions:adapter=>{extensionService=adapter||null;extensions?.setService(extensionService);extensions?.setWorkspace();workspaceViews?.setResearchService(extensionService);},
   openSettings,closeSettings:()=>settings?.close(),openModelPicker:(kind='model')=>chatModelPicker?.open(kind),
   getState:()=>({...state,piActivity:piActivity?.getState(),reply:reply.getState(),piConnected:Boolean(piSession),piRuntime:piRuntime?.getState(),piWorkbench:piWorkbench?.getState(),modelPicker:chatModelPicker?.getState(),workspace:workspaceStore?.getState(),workspaceView:workspaceViews?.getState(),knowledge:knowledge?.getState(),records:records?.getState(),connections:connectionManager?.getState(),models:modelSettings?.getState(),extensions:extensions?.getState(),approval:workspaceChrome?.getState(),settings:settings?.getState(),settingsOpen:Boolean(settings?.isOpen()),surface:surfaces?.getState(),layout:layout?.getState(),document:q('#ac-document-editor').value,prompt:composer.getValue()}),submit,search,
-  destroy(){appDestroyed=true;clearPiPreview();piSessionUnsubscribe?.();piSubscription?.();piRuntimeSubscription?.();piEventSubscription?.();workspaceOff?.();connectionOff?.();recordsOff?.();recordToolbar?.destroy();paperPanel?.destroy();records?.destroy();connectionManager?.destroy();chatModelPicker?.destroy();piWorkbench?.destroy();piRuntime?.destroy();piManualView?.destroy();piManualTools.clear();piView?.destroy();piActivity?.destroy();workspaceChrome?.destroy();workspaceViews?.destroy();knowledge?.destroy();modelSettings?.destroy();providerProfiles?.destroy();extensions?.destroy();workspaceStore?.destroy();demoStore?.destroy();settings?.destroy();controller.abort();resize?.disconnect();layout?.destroy();surfaces?.destroy();clearTimeout(toastTimer);clearTimeout(reconcileTimer);composer.destroy();reply.destroy();taskList.destroy();command?.destroy();tooltips.destroy()}
+  destroy(){appDestroyed=true;clearPiPreview();piSessionUnsubscribe?.();piSubscription?.();piRuntimeSubscription?.();piEventSubscription?.();workspaceOff?.();connectionOff?.();recordsOff?.();recordToolbar?.destroy();paperPanel?.destroy();researchFlow?.destroy();records?.destroy();connectionManager?.destroy();chatModelPicker?.destroy();piWorkbench?.destroy();piRuntime?.destroy();piManualView?.destroy();piManualTools.clear();piView?.destroy();piActivity?.destroy();workspaceChrome?.destroy();workspaceViews?.destroy();knowledge?.destroy();modelSettings?.destroy();providerProfiles?.destroy();extensions?.destroy();workspaceStore?.destroy();demoStore?.destroy();settings?.destroy();controller.abort();resize?.disconnect();layout?.destroy();surfaces?.destroy();clearTimeout(toastTimer);clearTimeout(reconcileTimer);composer.destroy();reply.destroy();taskList.destroy();command?.destroy();tooltips.destroy()}
  };
  window.dispatchEvent(new CustomEvent('athena:ready'));
 })();

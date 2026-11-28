@@ -4,7 +4,7 @@ This follow-up is based on source `6d38a5c0def941b00fc98f2d9eabdeabe60ab72f`, on
 
 ## Workflow graph
 
-Workflow opens in Graph view. Native task buttons show the reported task name, state, assigned agent and attempt, plus recorded background calculations. Selecting a task opens the existing attempt/tool/result detail; selecting a calculation opens its existing execution record. List view remains available. Fit, zoom, actual-size and a scrollable viewport support narrow panels and larger graphs.
+The chat-led research panel opens with a stage list. Its **Workflow graph** action opens the existing graph. Selecting a stage uses its owning task to select the corresponding run. Workflow opens in Graph view. Native task buttons show the reported task name, state, assigned agent and attempt, plus recorded background calculations. Selecting a task opens the existing attempt/tool/result detail; selecting a calculation opens its existing execution record. List view remains available. Fit, zoom, actual-size and a scrollable viewport support narrow panels and larger graphs.
 
 The graph uses host records; it does not schedule work. Its inspiration is the small-task graph and explicit verification stages described by [Oh My Hermes / dag-ulw](https://github.com/rlaope/oh-my-hermes/blob/main/README.md). No third-party scheduler or source code was imported.
 

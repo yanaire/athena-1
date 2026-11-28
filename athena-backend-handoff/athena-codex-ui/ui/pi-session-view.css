@@ -1,13 +1,13 @@
 #athena-codex .ar-activity-slot {min-width:0;margin:7px 0 16px;}
 #athena-codex .ap-tool-event {min-width:0;margin:5px 0;color:rgba(48,52,46,.70);}
-#athena-codex .ap-tool-event > summary {display:flex;align-items:flex-start;gap:9px;list-style:none;padding:7px 0;min-width:0;}
+#athena-codex .ap-tool-event > summary {display:flex;align-items:center;gap:9px;list-style:none;padding:7px 0;min-width:0;}
 #athena-codex .ap-tool-event > summary::-webkit-details-marker {display:none;}
 #athena-codex .ap-tool-event > summary > svg {width:11px;height:11px;margin-top:5px;transform:rotate(-90deg);transition:transform .15s ease;flex:none;}
 #athena-codex .ap-tool-event[open] > summary > svg {transform:rotate(0);}
 #athena-codex .ap-tool-icon {display:inline-flex;flex:none;margin-top:1px;}
-#athena-codex .ap-tool-copy {flex:1;min-width:0;font-size:12px;line-height:1.8;}
-#athena-codex .ap-tool-label {display:block;}
-#athena-codex .ap-tool-target {display:block;white-space:pre-wrap;overflow-wrap:anywhere;color:rgba(48,52,46,.60);font-size:11px;line-height:1.7;}
+#athena-codex .ap-tool-copy {flex:1;display:flex;align-items:baseline;gap:8px;min-width:0;font-size:12px;line-height:1.8;}
+#athena-codex .ap-tool-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;max-width:100%;}
+#athena-codex .ap-tool-target {display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgba(48,52,46,.60);font-size:11px;line-height:1.7;}
 #athena-codex .ap-tool-body {min-width:0;padding:4px 0 13px 26px;font-size:11px;line-height:1.8;}
 #athena-codex .ap-tool-body dl {display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 8px;}
 #athena-codex .ap-tool-body dl > div {display:flex;gap:7px;min-width:0;}
@@ -20,7 +20,7 @@
 #athena-codex .ap-copy-label {display:block;margin-top:8px;}
 #athena-codex .ap-copy-label textarea {display:block;width:100%;min-height:80px;resize:vertical;background:#fafbf6;border:1px solid #d6d8cd;border-radius:5px;padding:8px;font:11px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;}
 #athena-codex .ap-session-error {font-size:12px;line-height:1.8;color:#955c48;overflow-wrap:anywhere;}
-#athena-codex .aw-tool-target {display:block;font-size:11px;line-height:1.7;color:rgba(48,52,46,.60);white-space:pre-wrap;overflow-wrap:anywhere;}
+#athena-codex .aw-tool-target {min-width:0;font-size:11px;color:var(--ac-muted);}
 #athena-codex .aw-agent-event > summary > .ap-icon {margin-top:2px;}
 @media(pointer:coarse){#athena-codex .ap-tool-event > summary,#athena-codex .ap-tool-actions button {min-height:44px;}#athena-codex .ap-copy-label textarea {font-size:16px;}}
 @media(prefers-reduced-motion:reduce){#athena-codex .ap-tool-event > summary > svg {transition:none;}}

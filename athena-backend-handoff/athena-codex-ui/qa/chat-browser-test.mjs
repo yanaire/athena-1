@@ -178,14 +178,15 @@ try {
   if (!smoke) {
     await idle();
     const transcript = await page.locator('#ac-pi-transcript').innerText();
-    assert.match(transcript, /Summarize voltage measurements/); assert.match(transcript, /Calculate the RC response/);
+    assert.match(transcript, /Research activity/);
+    assert.equal(await page.locator('#ac-pi-transcript .ac-stream-activity[open]').count(), 0);
     assert.match(transcript, /Both calculations completed/);
     await verifyChatFollow();
     checks.push('Without reader scrolling, streamed work and the completed answer stay at the bottom of the conversation viewport.');
     assert.deepEqual(await page.locator('#ac-pi-transcript [data-role="user"]').first().locator('.ac-message-attachment').allTextContents(), inputs.map(input => input.name));
     assert.equal(transcript.includes('Input attachment (never a result)'), false);
     for (const record of [...result.tasks, ...result.attempts, ...result.processes]) assert.equal(transcript.includes(record.id), false, 'Internal IDs must stay out of ordinary activity text.');
-    const sequence = await page.locator('#ac-pi-transcript').evaluate(element => [...element.children].map(node => ({ role: node.dataset.role, attempt: node.dataset.awAttempt, text: node.innerText })));
+    const sequence = await page.locator('#ac-pi-transcript').evaluate(element => [...element.children].map(node => ({ role: node.dataset.role, attempt: node.matches('.ac-stream-activity') && !!node.querySelector('[data-aw-attempt]'), text: node.innerText })));
     assert.ok(sequence.findIndex(row => row.attempt) > sequence.findIndex(row => row.role === 'user'));
     assert.ok(sequence.findIndex(row => row.attempt) < sequence.findIndex(row => row.text.includes('Both calculations completed.')));
     checks.push('Child activities stay with their originating turn, show real actions and do not expose internal IDs or attachment instructions.');

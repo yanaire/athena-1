@@ -10,12 +10,14 @@ import { privateTestDirectory } from './platform-test-helpers.ts';
 import { JobRunner } from '../runtime/jobs.ts';
 import { CrossrefProvider } from '../runtime/crossref.ts';
 import { TaskManager } from '../runtime/manager.ts';
+import { Papers } from '../runtime/papers.ts';
+import { Storage } from '../runtime/storage.ts';
 import type { ResearchEvidence, ResearchMission, ResearchReview } from '../runtime/research.ts';
 
 type Wire = { model: string; messages: { role: string; content: unknown }[]; tools: { function: { name: string } }[] };
 type Call = { name: string; args: object };
 type Snapshot = ReturnType<TaskManager['getSnapshot']>;
-type Assignment = Pick<ResearchReview, 'id' | 'missionId' | 'question' | 'targets'> & { reviewId: string };
+type Assignment = Pick<ResearchReview, 'id' | 'missionId' | 'question' | 'targets' | 'contextFiles'> & { reviewId: string };
 const sha256 = (value: Uint8Array | string) => createHash('sha256').update(value).digest('hex');
 function text(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -308,8 +310,11 @@ test('execution disabled preserves CSV evidence and observations after joining, 
 test('paper outlining, editorial revision, independent frozen reviews and exact exports survive restart', {timeout:90000}, async t=>{
   const directory=await realpath(privateTestDirectory(join(tmpdir(),'paper-integration-')));
   const sourceText='The reported voltage is 19 mV.',title='Voltage study';
-  let authorized='',sourceId='',round=0;const errors:string[]=[];
+  let authorized='',sourceId='',round=0,sectionPlanCalls=0;const errors:string[]=[];
   let held:ReturnType<typeof Promise.withResolvers<void>>|undefined, holdStage='';
+  let previous:{version:string;text:string;assessment:ResearchReview}|undefined;
+  const remainingFinding='Add the measurement uncertainty or explicitly state it was never reported.';
+  const revisedText='# Results\n\n'+sourceText+'\nRevision 2\n\n## Measurement limits\nMeasurement uncertainty was not reported.';
   const server=createServer(async(request,response)=>{
     try {
       const chunks:Buffer[]=[];for await(const c of request)chunks.push(Buffer.from(c));
@@ -320,17 +325,41 @@ test('paper outlining, editorial revision, independent frozen reviews and exact 
       let next:string|Call;
       if(parent(w)&&prompt.startsWith('Execute my approved bibliography search'))next=out.length?'Candidates ready.':{name:'run_bibliography_search',args:{searchId:authorized}};
       else if(parent(w))next=out.length?'Manuscript stage settled.':{name:'compose_manuscript',args:prompt.includes('Manuscript outline request')?{outline:['Results']}:{}};
-      else if(prompt.includes('Return only a JSON array'))next=JSON.stringify([{heading:'Results',text:sourceText}]);
+      else if(prompt.includes('Plan the literature synthesis'))next=JSON.stringify([{heading:'Results',purpose:'Compare the reported voltage.',sources:[++sectionPlanCalls===1?2:1],visual:''}]);
+      else if(prompt.includes('Return only a JSON array'))next=['```json',JSON.stringify([{heading:'Results',text:sourceText}]),'```'].join('\n');
       else if(prompt.includes('Use publish_manuscript')) {
-        if(!out.length){round++;next={name:'publish_manuscript',args:{text:'# Results\n\n'+sourceText+'\nRevision '+round,
-          links:[{kind:'claim',sourceId,quote:sourceText,excerpt:sourceText,locator:'line 1'}]}};}
-        else {assert.ok(JSON.parse(out[0]!).artifact);next='Published the manuscript.';}
+        const revision=prompt.includes('Revise the prior edition directly.');
+        const contextGrants=revision?(JSON.parse(prompt.split('Granted input files: ')[1]!) as {name:string;fileId:string}[]).filter(f=>f.name.startsWith('prior-')):[];
+        if(out.length<contextGrants.length)next={name:'read_file',args:{fileId:contextGrants[out.length]!.fileId}};
+        else if(out.length===contextGrants.length){
+          round++;
+          if(revision){
+            assert.ok(previous);assert.match(prompt,new RegExp(previous.version));assert.match(prompt,/Compare the reported voltage/);
+            assert.equal(out[0],previous.text);
+            const recorded=JSON.parse(out[1]!);
+            assert.equal(recorded.reviewId,previous.assessment.id);assert.deepEqual(recorded.findings,[remainingFinding]);
+            assert.deepEqual(recorded.checks,previous.assessment.checks);assert.equal(recorded.sha256,sha256(previous.text));
+          }
+          next={name:'publish_manuscript',args:{text:revision?revisedText:'# Results\n\n'+sourceText+'\nRevision '+round,
+            links:[{kind:'claim',sourceId,quote:sourceText,excerpt:sourceText,locator:'line 1'}]}};
+        }
+        else {assert.ok(JSON.parse(out.at(-1)!).artifact);next='Published the manuscript.';}
       } else {
         const info=JSON.parse(prompt.split('Review assignment: ')[1]!.split('\nGranted input files:')[0]!) as Assignment;
-        const target=info.targets[out.length];
+        const inputs=[...info.targets,...(info.contextFiles??[])],target=inputs[out.length];
         if(target)next={name:'read_file',args:target.kind==='file'?{fileId:target.id}:{artifactId:target.id}};
-        else if(out.length===info.targets.length)next={name:'submit_review',args:{reviewId:info.reviewId,verdict:round===1?'changes_required':'supported',
-          checks:['Claims: inspected underlying voltage.','Citations: compared exact source passage.','Figures: no figures claimed.'],findings:round===1?['Clarify units in the edited version.']:[]}};
+        else if(out.length===inputs.length){
+          assert.match(info.question,/User-provided research brief.*Report the measured voltage/);
+          if(round===3){
+            assert.ok(previous);assert.match(info.question,new RegExp(previous.assessment.id));
+            assert.equal(info.contextFiles?.length,2);assert.equal(out.at(-2),previous.text);
+            assert.deepEqual(JSON.parse(out.at(-1)!).findings,[remainingFinding]);
+            assert.ok(!info.contextFiles.some(f=>info.targets.some(e=>e.id===f.id)));
+          }
+          next={name:'submit_review',args:{reviewId:info.reviewId,verdict:round<=2?'changes_required':'supported',
+            checks:['Claims: inspected underlying voltage.','Citations: compared exact source passage.','Figures: no figures claimed.'],
+            findings:round===1?['Clarify units in the edited version.']:round===2?[remainingFinding]:[]}};
+        }
         else next='Review recorded.';
       }
       complete(response,next);
@@ -364,13 +393,45 @@ test('paper outlining, editorial revision, independent frozen reviews and exact 
     assert.equal((await call('startPaper',req)).runId,receipt.runId);
     assert.deepEqual(errors,[]);assert.equal(snap.run.status,'succeeded');
     const d=await call('paperDetails',{documentId});assert.deepEqual(d.outline,['Results'],JSON.stringify(snap.tools));
-    if(mode==='write'){assert.equal(d.runs.at(-1).stage,'supported',JSON.stringify([d.runs.at(-1),snap.tools.map(t=>[t.name,t.status,t.logs.at(-1)?.text.slice(0,300)])]));
+    if(mode==='write'){assert.equal(d.runs.at(-1).stage,'changes_required',JSON.stringify([d.runs.at(-1),snap.tools.map(t=>[t.name,t.status,t.logs.at(-1)?.text.slice(0,300)])]));
+      assert.deepEqual(d.runs.at(-1).sectionBriefs[0].sources,[{sourceId,version:source.version}]);
+      const plans=d.runs.at(-1).attempts.filter((attempt:{role:string})=>attempt.role==='Plan manuscript evidence');
+      assert.equal(plans.length,2);assert.equal(plans[0].taskId,plans[1].taskId);assert.notEqual(plans[0].attemptId,plans[1].attemptId);
       assert.equal(snap.tasks.filter(t=>t.parentTaskId).length,4);assert.equal(snap.processes.length,2);}
   }
-  const d=await call('paperDetails',{documentId}),r=d.runs.at(-1);assert.equal(r.reviews.length,2);
-  assert.notEqual(r.reviews[0].reviewer.agentSessionId,r.reviews[1].reviewer.agentSessionId);
+  const exhausted=(await call('paperDetails',{documentId})).runs.at(-1);
+  assert.equal(exhausted.reviews.length,2);
+  assert.notEqual(exhausted.reviews[0].reviewer.agentSessionId,exhausted.reviews[1].reviewer.agentSessionId);
+  previous=await call('getDocument',{documentId});assert.ok(previous);
+  assert.deepEqual(previous.assessment.findings,[remainingFinding]);
+  await manager.close();manager=new TaskManager({dataDir:directory});await manager.initialize();
+  const revisionRequest={documentId,sessionId,mode:'write',requestId:'write-after-exhausted-review',expectedBaseVersion:previous.version};
+  const receipt=await call('startPaper',revisionRequest);
+  await terminal(manager);assert.deepEqual(errors,[]);
+  const d=await call('paperDetails',{documentId}),revised=d.runs.at(-1);
+  assert.equal(revised.baseVersion,previous.version);assert.equal(revised.stage,'supported');
+  assert.deepEqual(revised.attempts.map((a:{role:string})=>a.role),['Edit manuscript','Review manuscript 1']);
+  assert.equal(revised.versions.length,1);assert.equal(revised.uploads.length,1);
+  assert.deepEqual(revised.sectionBriefs,exhausted.sectionBriefs);
+  const ledger=new Storage(directory);
+  try {
+    const papers=new Papers(ledger);
+    const legacy={...revised,sectionBriefs:undefined};
+    const planFor=(run:typeof legacy)=>papers.sectionPlan({...d,runs:d.runs.with(-1,run)},run);
+    assert.deepEqual(planFor(legacy),exhausted.sectionBriefs);
+    assert.equal(planFor({...legacy,revisionReviewId:exhausted.reviews[0].id}),undefined,'An assessment of an earlier edition cannot supply this plan.');
+    assert.equal(planFor({...legacy,context:{...legacy.context,sessionId:'another-conversation'}}),undefined);
+  } finally {ledger.close();}
+  assert.notEqual(revised.reviews[0].reviewer.agentSessionId,previous.assessment.reviewer?.agentSessionId);
   const first=await call('getDocument',{documentId,version:d.versions[0]}),second=await call('getDocument',{documentId});
+  assert.equal((await call('startPaper',revisionRequest)).runId,receipt.runId);
+  await assert.rejects(call('startPaper',{...revisionRequest,expectedBaseVersion:first.version}),{code:'REQUEST_ID_CONFLICT'});
+  await assert.rejects(call('startPaper',{...revisionRequest,requestId:'stale-review'}),{code:'VERSION_CONFLICT'});
+  assert.equal((await call('paperDetails',{documentId})).runs.length,d.runs.length);
+  assert.deepEqual(second.sectionChecks,[{heading:'Results',linkedPassages:1},{heading:'Measurement limits',linkedPassages:0}]);
+  assert.equal(second.text,revisedText);assert.equal(second.baseVersion,previous.version);
   assert.equal(first.review.status,'changes_requested');assert.equal(second.review.status,'approved');
+  assert.deepEqual((await call('getDocument',{documentId,version:previous.version})).assessment,previous.assessment);
   const md=await call('exportPaper',{documentId,version:first.version,format:'md'});
   const manifest=await call('exportPaper',{documentId,version:first.version,format:'json'});
   const saved=await manager.artifactDownload(sessionId,md.id);assert.equal(saved.bytes.toString(),first.text);

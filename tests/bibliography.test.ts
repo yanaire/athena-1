@@ -7,7 +7,8 @@ import { randomUUID } from 'node:crypto';
 import { Storage } from '../runtime/storage.ts';
 import { Papers } from '../runtime/papers.ts';
 import { Bibliography } from '../runtime/bibliography.ts';
-import { CrossrefProvider } from '../runtime/crossref.ts';
+import { hash } from '../runtime/orchestration.ts';
+import { CrossrefProvider, type Candidate } from '../runtime/crossref.ts';
 import { privateTestDirectory } from './platform-test-helpers.ts';
 import type { TestContext } from 'node:test';
 function setup(t:TestContext,transport:typeof fetch){
@@ -61,4 +62,36 @@ test('concurrent searches, cancellation, timeout and duplicate dispatch have dis
   lib.cancel('p','s',first.id);assert.equal((await waiting).status,'cancelled');assert.equal(requests,1);
   const deadline=new AbortController();t.mock.method(AbortSignal,'timeout',()=>deadline.signal);
   const expiring=lib.execute('p','s',prepare().id);deadline.abort();assert.equal((await expiring).error,'timeout');
+});
+
+test('a journal deposit retains the source digest while indexing XML text exactly once', async()=>{
+  const doi='10.21105/joss.00024';
+  const xml=`<?xml version="1.0"?><doi_batch><body><journal><journal_article>
+    <titles><title>H<sub>2</sub> &amp; slopes &amp;lt; &#x3B2;</title></titles>
+    <contributors><person_name contributor_role='author'><given_name>Anne</given_name><surname>Rose &amp; Reed</surname></person_name></contributors>
+    <publication_date><year>2016</year></publication_date>
+    <citation_list><citation><doi>10.1000/earlier-reference</doi></citation></citation_list>
+    <doi_data><doi>${doi}</doi></doi_data>
+  </journal_article></journal></body></doi_batch>`;
+  const provider=new CrossrefProvider(async()=>new Response(xml));
+  const records:Candidate[]=[];
+  await provider.retrieve({mode:'doi',term:doi,pages:1},new AbortController().signal,rows=>records.push(...rows));
+  assert.equal(records.length,1);
+  const [record]=records;
+  assert.ok(record);
+  assert.equal(record.doi,doi);
+  assert.equal(record.title,'H2 & slopes &lt; β');
+  assert.deepEqual(record.raw.author,[{given:'Anne',family:'Rose & Reed'}]);
+  assert.equal(record.raw.depositSha256,hash(xml));
+  assert.equal(record.rawSha256,hash(JSON.stringify(record.raw)));
+});
+
+test('Crossref abstracts retain paragraph and inline scientific text', async()=>{
+  const abstract='<jats:p>H<sub>2</sub>O &amp; CO<sub>2</sub>.</jats:p><jats:p><![CDATA[x < y]]> and &amp;lt;.</jats:p>';
+  const literal='A mean < 5 & a range of 2 units.';
+  const provider=new CrossrefProvider(async()=>result([{...item(1),abstract},{...item(2),abstract:literal}]));
+  const records:Candidate[]=[];
+  await provider.retrieve({mode:'query',term:'means',pages:1},new AbortController().signal,rows=>records.push(...rows));
+  assert.deepEqual(records.map(record=>record.abstract),['H2O & CO2. x < y and &lt;.',literal]);
+  assert.equal(records[0]?.raw.abstract,abstract);
 });

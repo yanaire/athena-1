@@ -23,7 +23,7 @@
     host.classList.add('aex-host');
     host.innerHTML = '<div class="aex-heading"><div><h3>Project tools &amp; skills</h3><p data-aex-project></p></div><button type="button" class="ast-button cursor-interaction" data-aex-action="refresh">' + icon('refresh-cw') + 'Refresh</button></div>'
       + '<p class="aex-note" data-aex-availability></p><p class="aex-error" role="alert" data-aex-error hidden></p><p class="aex-note" role="status" data-aex-status hidden></p>'
-      + '<div data-aex-content hidden><details class="aex-import" data-aex-detail="import"><summary class="cursor-interaction">Import or update a plugin</summary>'
+      + '<div data-aex-content hidden><button type="button" class="ast-button cursor-interaction" data-aex-action="install-github">Install GitHub plugin</button><details class="aex-import" data-aex-detail="import"><summary class="cursor-interaction">Import or update a plugin</summary>'
       + '<p class="aex-note">Import a declarative JSON package containing skills and MCP server settings. New and updated packages start disabled. No package scripts are executed.</p>'
       + '<label class="aex-field">Package file<input type="file" accept=".json,application/json" data-aex-file></label>'
       + '<label class="aex-field">Package JSON<textarea rows="7" spellcheck="false" autocomplete="off" data-aex-manifest placeholder="Paste the plugin manifest"></textarea></label>'
@@ -44,14 +44,15 @@
 
     function serverHTML(plugin, server) {
       const checked = server.status === 'verified';
-      const credential = server.auth === 'bearer' ? '<label class="aex-field">Bearer token <span class="aex-note">(leave blank to use the saved connection)</span><input type="password" autocomplete="off" maxlength="8192" data-aex-token data-plugin="' + esc(plugin.id) + '" data-server="' + esc(server.id) + '" aria-label="Bearer token for ' + esc(server.name) + '"></label>' : '';
+      const github = plugin.id === 'athena-github';
+      const credential = server.auth === 'bearer' ? '<label class="aex-field">' + (github ? 'GitHub personal access token' : 'Bearer token') + ' <span class="aex-note">(leave blank to use the saved connection)</span><input type="password" autocomplete="off" maxlength="8192" data-aex-token data-plugin="' + esc(plugin.id) + '" data-server="' + esc(server.id) + '" aria-label="Bearer token for ' + esc(server.name) + '"></label>' : '';
       const toolNames = rows(server.verification?.tools).map(tool => tool.name);
       return '<div class="aex-server"><div class="aex-card-heading"><strong>' + esc(server.name) + '</strong><span class="aex-badge" data-state="' + (checked ? 'checked' : 'idle') + '">' + (checked ? 'Connection checked' : server.status === 'failed' ? 'Connection failed' : 'Not checked') + '</span></div>'
         + '<p class="aex-endpoint">' + esc(server.url) + '</p><p class="aex-note">Calls are restricted to the tools listed below. Local project files are not transferred automatically.</p>'
         + (rows(server.allowedTools).length ? '<p class="aex-note">Approved tools: ' + rows(server.allowedTools).map(esc).join(', ') + '</p>' : '')
         + (server.lastError ? '<p class="aex-error">' + esc(server.lastError) + '</p>' : '')
-        + (server.auth === 'bearer' ? '<p class="aex-note">' + (server.credentialConfigured ? 'A dedicated connection token is saved by the host.' : 'This server requires a dedicated connection token.') + '</p>' : '') + credential
-        + '<button type="button" class="ast-button cursor-interaction" data-aex-action="check" data-plugin="' + esc(plugin.id) + '" data-server="' + esc(server.id) + '" data-aex-focus="check-' + esc(plugin.id + '-' + server.id) + '">' + icon('plug-zap') + (checked ? 'Check connection again' : 'Check connection') + '</button>'
+        + (server.auth === 'bearer' ? '<p class="aex-note">' + (server.credentialConfigured ? 'A dedicated connection token is saved by the host.' : 'This server requires a dedicated connection token.') + '</p>' : '') + (github ? '<p class="aex-note">Use a fine-grained token with read access to contents and metadata for the repositories you select.</p>' : '') + credential
+        + '<button type="button" class="ast-button cursor-interaction" data-aex-action="check" data-plugin="' + esc(plugin.id) + '" data-server="' + esc(server.id) + '" data-aex-focus="check-' + esc(plugin.id + '-' + server.id) + '">' + icon('plug-zap') + (github && !plugin.enabled ? 'Connect and enable GitHub' : checked ? 'Check connection again' : 'Check connection') + '</button>'
         + (checked ? '<p class="aex-note">Discovery completed ' + esc(when(server.verification?.checkedAt)) + '. A connection check does not execute a research calculation.</p>' : '')
         + diagnostics([['Transport', server.transport], ['Server ID', server.id], ['Server identity', server.verification?.serverInfo], ['MCP protocol', server.verification?.protocolVersion], ['Schema digest', server.verification?.digest], ['Discovered tools', toolNames]], 'server-' + plugin.id + '-' + server.id) + '</div>';
     }
@@ -61,7 +62,7 @@
       const disabled = !plugin.enabled && !ready;
       return '<article class="aex-card" data-aex-plugin="' + esc(plugin.id) + '"><div class="aex-card-heading"><div><h4>' + esc(plugin.name) + '</h4><span class="aex-note">Version ' + esc(plugin.version) + (plugin.builtin ? ' · Built in' : '') + '</span></div><span class="aex-badge" data-state="' + (plugin.enabled ? 'enabled' : 'idle') + '">' + (plugin.enabled ? 'Enabled' : 'Installed · Disabled') + '</span></div>'
         + '<p>' + esc(plugin.description) + '</p>' + (rows(plugin.servers).length ? '<p class="aex-note">Enabling permits calls to the approved endpoints below. Each call sends its tool arguments from this device to that endpoint.</p>' : '') + '<div class="aex-actions"><button type="button" class="ast-button cursor-interaction" data-aex-action="toggle-plugin" data-plugin="' + esc(plugin.id) + '" data-aex-focus="plugin-' + esc(plugin.id) + '"' + (disabled ? ' disabled title="Check each MCP connection before enabling this package"' : '') + '>' + (plugin.enabled ? 'Disable' : 'Enable') + '</button>'
-        + (!plugin.builtin ? '<button type="button" class="aex-text-button cursor-interaction" data-aex-action="remove" data-plugin="' + esc(plugin.id) + '">Remove</button>' : '') + '</div>'
+        + (!plugin.builtin || plugin.id === 'athena-github' ? '<button type="button" class="aex-text-button cursor-interaction" data-aex-action="remove" data-plugin="' + esc(plugin.id) + '">Remove</button>' : '') + '</div>'
         + (disabled ? '<p class="aex-note">Check each MCP connection before enabling this package.</p>' : '')
         + rows(plugin.servers).map(server => serverHTML(plugin, server)).join('')
         + diagnostics([['Package ID', plugin.id], ['Revision', plugin.revision], ['Installed', when(plugin.installedAt)], ['Updated', when(plugin.updatedAt)], ['Skills', rows(plugin.skills).map(skill => skill.name)]], 'plugin-' + plugin.id) + '</article>';
@@ -90,6 +91,7 @@
 
     function render() {
       if (destroyed) return;
+      options.onSkillsChange?.(sessionId && supported() ? snapshot?.skills || [] : []);
       const project = rows(workspace().projects).find(item => item.id === projectId);
       q('[data-aex-project]').textContent = project?.name || (projectId ? 'Current project' : 'Select a project');
       q('[data-aex-availability]').textContent = !service ? 'Connect an Athena host with extension support to manage real packages and skills.' : !projectId ? 'Open a project conversation to manage its tools and skills.' : '';
@@ -108,6 +110,10 @@
       }
       for (const button of host.querySelectorAll('button')) {
         if (button.dataset.aexAction === 'refresh') button.disabled = !supported() || busy;
+        else if (button.dataset.aexAction === 'install-github') {
+          button.hidden = !service?.installGitHubPlugin || rows(snapshot?.plugins).some(plugin => plugin.id === 'athena-github');
+          button.disabled = !supported() || !snapshot || busy;
+        }
         else if (button.dataset.aexAction === 'install') button.disabled = !supported() || !snapshot || busy;
         else if (busy || !supported()) button.disabled = true;
       }
@@ -190,6 +196,10 @@
       if (!button || !host.contains(button) || button.disabled) return;
       const action = button.dataset.aexAction;
       if (action === 'refresh') { void refresh(); return; }
+      if (action === 'install-github') {
+        void mutate((scope, revision) => service.installGitHubPlugin(scope, revision), 'GitHub installed. Enter a personal access token to connect this project.');
+        return;
+      }
       if (action === 'install') {
         const value = q('[data-aex-manifest]').value;
         let manifest;
@@ -206,11 +216,18 @@
       const plugin = rows(snapshot?.plugins).find(item => item.id === button.dataset.plugin);
       if (!plugin) return;
       if (action === 'toggle-plugin') void mutate((scope, revision) => service.setPluginEnabled(scope, plugin.id, !plugin.enabled, revision), plugin.enabled ? 'Package disabled for new runs.' : 'Package enabled for new runs.');
-      if (action === 'remove' && !plugin.builtin) void mutate((scope, revision) => service.removePlugin(scope, plugin.id, revision), 'Package removed from future selection. Existing research keeps its saved versions.');
+      if (action === 'remove' && (!plugin.builtin || plugin.id === 'athena-github')) void mutate((scope, revision) => service.removePlugin(scope, plugin.id, revision), 'Package removed from future selection. Existing research keeps its saved versions.');
       if (action === 'check') {
         const server = rows(plugin.servers).find(item => item.id === button.dataset.server); if (!server) return;
         const field = [...host.querySelectorAll('[data-aex-token]')].find(item => item.dataset.plugin === plugin.id && item.dataset.server === server.id);
         const token = field?.value || ''; if (field) field.value = '';
+        if (plugin.id === 'athena-github' && !plugin.enabled) {
+          void mutate(async (scope, revision) => {
+            const checked = await service.checkMcpServer(scope, plugin.id, server.id, revision, token ? {token} : {});
+            await service.setPluginEnabled(scope, plugin.id, true, checked.revision);
+          }, 'GitHub connected. Repository tools are available to workers in new runs.');
+          return;
+        }
         void mutate((scope, revision) => service.checkMcpServer(scope, plugin.id, server.id, revision, token ? { token } : {}), 'MCP connection and approved tool schemas checked.');
       }
     }, { signal: controller.signal });

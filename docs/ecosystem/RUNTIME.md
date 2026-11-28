@@ -14,6 +14,11 @@ checks each source path and content hash, and archives the accepted package in
 its host store. These startup integrity checks read the sources; they do not
 place every source in a model prompt.
 
+In chat, `$` lists enabled skills for the coordinator. A sent `$skill-id` or
+`$plugin-id/skill-id` loads the pinned procedure into the coordinator’s next
+model request and records explicit selection on its attempt. Workers can load
+procedures allowed for their role using `load_skill`.
+
 The model receives metadata. `load_skill` loads only its selected procedure and
 records the project, conversation, run, task, agent session and attempt,
 selection reason, content hash, version, mode and effective capabilities. A
@@ -155,3 +160,13 @@ removal, stale configuration, old pins and retained usage evidence. They do not
 establish access to a particular third-party service, native Mac operation or
 actual ChatGPT-account inference. Those require the exact integrated candidate's
 separate acceptance evidence.
+
+## GitHub repository connection
+
+In a project conversation, open **Settings → Tools & plugins → Install GitHub plugin**.
+Enter a GitHub personal access token and choose **Connect and enable GitHub**. For a
+fine-grained token, select the repositories you want to use and grant read access
+to their contents and metadata. Athena discovers the upstream tools before enabling
+the package for new runs. Workers can search repositories, list branches and list
+commits. The project card also supports rechecking, disabling and removing the
+connection. [GitHub MCP Server toolsets](https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md)

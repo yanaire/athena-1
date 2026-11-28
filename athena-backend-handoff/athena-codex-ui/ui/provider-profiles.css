@@ -81,3 +81,10 @@
 #athena-codex .amp-profile-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 #athena-codex .amp-profile-form .amp-actions { margin-top: 12px; }
 #athena-codex .amp-root[data-busy="true"] .amp-profile-actions .ams-button[disabled], #athena-codex .amp-root[data-busy="true"] [data-amp-profile-save][disabled] { opacity: .6; }
+
+#athena-codex .amp-live-roles [data-legacy-role-routing]{display:none}
+#athena-codex .amp-worker-row{display:grid;grid-template-columns:minmax(105px,1fr) minmax(135px,1.4fr) minmax(100px,1fr);align-items:center;gap:8px;margin:8px 0}
+#athena-codex .amp-worker-row select{width:100%;min-width:0}
+@media(max-width:600px){#athena-codex .amp-worker-row{grid-template-columns:1fr 1fr}.amp-worker-row strong{grid-column:1/-1}}
+
+#athena-codex #ast-worker-models-slot:not(:empty) > section:not([hidden]) { margin: 0 0 22px; }

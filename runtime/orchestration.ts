@@ -27,14 +27,14 @@ export function limit(name: string, fallback: number, min: number, max: number):
 }
 export type Context = { readonly projectId: string; readonly sessionId: string; readonly runId: string;
   readonly taskId: string; readonly parentTaskId: string | null; readonly agentSessionId: string; readonly attemptId: string };
-export type Attempt = Context & { readonly id: string; readonly requestId: string; readonly status: Status;
+export type Attempt = Context & { readonly workerRole?:import("./worker-roles.ts").WorkerRole; readonly id: string; readonly requestId: string; readonly status: Status;
   readonly prompt: string; readonly acceptedAt: number; readonly startedAt: number | null; readonly endedAt: number | null;
   readonly result?: string; readonly error?: string; readonly fileIds: readonly string[];
   readonly artifactGrants?: readonly string[]; readonly model?: ModelReference;
-  readonly kind?: 'reconciliation'; readonly retryOfAttemptId?: string };
+  readonly explicitSkillIds?:readonly string[]; readonly kind?: 'reconciliation'; readonly retryOfAttemptId?: string };
 export type TaskRow = Task & Context & { readonly result?: string; readonly error?: string };
 export type AgentSession = { readonly id: string; readonly projectId: string; readonly sessionId: string;
-  readonly sessionDir: string; readonly sessionFile: string; readonly role: 'parent' | 'child'; readonly model?: ModelReference | null };
+  readonly sessionDir: string; readonly sessionFile: string; readonly role: 'parent' | 'child'; readonly workerRole?:import('./worker-roles.ts').WorkerRole; readonly model?: ModelReference | null };
 export type Evidence = {readonly id:string; readonly version:string};
 export type ProcessRow = Context & { readonly id: string; readonly processId: string; readonly toolId: string;
   readonly status: JobAttempt['status']; readonly job: JobAttempt; readonly evidence?: readonly Evidence[] };

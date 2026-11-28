@@ -26,14 +26,14 @@ export const inputs = Object.freeze([
 const text = value => typeof value === 'string' ? value : Array.isArray(value) ? value.map(part => part?.text || '').join('\n') : '';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function createFixture() {
+export async function createFixture(researchResponder, { hostNodeArgs = [], modelConcurrency = 2, streamSections = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'athena-chat-browser-'));
   const failures = [], calls = [];
   let child, origin = '', hostPort = 0, hostOutput = '';
   const provider = createServer(async (request, response) => {
     if (request.method === 'GET' && request.url === '/v1/models') {
       response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ data: [{ id: 'browser-fixture' }] })); return;
+      response.end(JSON.stringify({ data: [{ id: 'browser-fixture' }, ...(researchResponder ? [{ id: 'paper-reader' }] : [])] })); return;
     }
     try {
       assert.equal(request.url, '/v1/chat/completions');
@@ -42,18 +42,18 @@ export async function createFixture() {
       const lastUserIndex = wire.messages.findLastIndex(message => message.role === 'user');
       const input = text(wire.messages[lastUserIndex]?.content);
       const outputs = wire.messages.slice(lastUserIndex + 1).filter(message => message.role === 'tool').map(message => text(message.content));
-      const coordinator = wire.tools.some(tool => tool.function.name === 'spawn_agent');
-      calls.push({ role: coordinator ? 'parent' : 'child', toolResults: outputs.length });
+      const coordinator = (wire.tools ?? []).some(tool => tool.function.name === 'spawn_agent');
+      calls.push({ ...(researchResponder ? {model:wire.model} : {}), role: coordinator ? 'parent' : 'child', toolResults: outputs.length });
       let next, before = '';
-      if (coordinator && input.startsWith(prompts.cancel)) {
+      if (researchResponder) next=await researchResponder({coordinator,input,outputs,model:wire.model,messages:wire.messages});
+      else if (coordinator && input.startsWith(prompts.cancel)) {
         response.writeHead(200, { 'content-type': 'text/event-stream' });
         const closed = once(response, 'close');
         response.write(frame({ role: 'assistant', content: 'Waiting for cancellation. This response is still streaming.' }));
         await delay(1800); // A second real stream update while the reader scrolls up.
         if (!response.destroyed) response.write(frame({ content: ' More text arrived while the reader reviewed earlier work.' }));
         await closed; return;
-      }
-      if (coordinator && !input.startsWith(prompts.compare)) {
+      } else if (coordinator && !input.startsWith(prompts.compare)) {
         next = input.startsWith('Please preserve this identifier exactly:')
           ? 'The requested identifier was preserved.' : 'The preserved draft was accepted.';
       } else if (coordinator) {
@@ -94,13 +94,20 @@ export async function createFixture() {
         response.write(frame({ role: 'assistant', content: before }));
         await delay(650); // Observe a live streamed message before the tool call arrives.
       }
-      const delta = typeof next === 'string' ? { role: 'assistant', content: next } : { role: 'assistant', tool_calls: [{
-        index: 0, id: 'call_' + randomUUID(), type: 'function', function: { name: next.name, arguments: JSON.stringify(next.args) },
-      }] };
-      response.write(frame(delta));
+      const delta = typeof next === 'string' ? { role: 'assistant', content: next } : { role: 'assistant', tool_calls: (Array.isArray(next)?next:[next]).map((call,index)=>({
+        index, id: 'call_' + randomUUID(), type: 'function', function: { name: call.name, arguments: JSON.stringify(call.args) },
+      })) };
+      if(streamSections && typeof next==='string' && input.includes('Return only a JSON array')){
+        // Leave enough time for two host checkpoint polls of incomplete JSON.
+        const first=Math.floor(next.length/3),second=2*first;
+        response.write(frame({role:'assistant',content:next.slice(0,first)}));await delay(1800);
+        response.write(frame({content:next.slice(first,second)}));await delay(1800);
+        response.write(frame({content:next.slice(second)}));
+      }else response.write(frame(delta));
       response.write(frame({}, typeof next === 'string' ? 'stop' : 'tool_calls'));
       response.end('data: [DONE]\n\n');
     } catch (error) {
+      if(researchResponder)console.error(error);
       failures.push(String(error.stack || error));
       if (!response.headersSent) response.writeHead(500, { 'content-type': 'application/json' });
       response.end(JSON.stringify({ error: { message: 'Controlled browser provider assertion failed.' } }));
@@ -114,10 +121,10 @@ export async function createFixture() {
   const providerPort = provider.address().port;
 
   async function startHost() {
-    child = spawn(process.execPath, ['runtime/server.ts'], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'], env: {
+    child = spawn(process.execPath, [...hostNodeArgs, 'runtime/server.ts'], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'], env: {
       ...process.env, ATHENA_DATA_DIR: directory, ATHENA_PORT: String(hostPort),
       ATHENA_ENDPOINT: `http://127.0.0.1:${providerPort}/v1`, ATHENA_MODEL: 'browser-fixture',
-      ATHENA_PROVIDER: '', ATHENA_API_KEY: '', ATHENA_MODEL_CONCURRENCY: '2', ATHENA_MAX_CHILDREN: '3', ATHENA_MAX_DEPTH: '1',
+      ATHENA_PROVIDER: '', ATHENA_API_KEY: '', ATHENA_MODEL_CONCURRENCY: String(modelConcurrency), ATHENA_MAX_CHILDREN: '3', ATHENA_MAX_DEPTH: '1',
     } });
     hostOutput = '';
     const started = new Promise((resolve, reject) => {
@@ -163,7 +170,7 @@ export async function createFixture() {
   try { await startHost(); }
   catch (error) { child?.kill('SIGKILL'); provider.closeAllConnections(); provider.close(); await rm(directory, { recursive: true, force: true }); throw error; }
   return {
-    get origin() { return origin; }, get calls() { return calls; }, get failures() { return failures; },
+    get providerEndpoint(){return "http://127.0.0.1:"+providerPort+"/v1";}, get origin() { return origin; }, get calls() { return calls; }, get failures() { return failures; },
     rpc, waitSnapshot, stopHost, startHost,
     async createConversation() {
       const { project } = await rpc('createProject', [{ name: 'Browser acceptance', defaultModel: null }]);

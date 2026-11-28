@@ -1,6 +1,6 @@
 # Athena 윈도우·인텔 맥 설치 안내
 
-Windows x64와 Intel Mac 지원이 포함된 소스 리비전에서 아래 명령을 실행합니다. 검토 중인 빌드를 재현할 때는 PR 또는 Actions에 표시된 커밋을 체크아웃합니다.
+GitHub Actions는 Apple Silicon Mac과 Windows x64에서 데스크톱 앱을 빌드하고 설치를 검증합니다. Intel Mac은 같은 소스에서 수동으로 빌드할 수 있습니다. 검토 중인 빌드를 재현할 때는 PR 또는 Actions에 표시된 커밋을 체크아웃합니다.
 
 ## 어떤 버전을 만들면 되나요?
 

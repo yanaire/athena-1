@@ -5,11 +5,26 @@
 #athena-codex .ac-stream-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 #athena-codex .ac-stream-tool { margin: -5px 0; }
 #athena-codex .ac-stream-tool .ap-tool-event { margin: 0; }
-#athena-codex .aw-attempt { border-left: 2px solid var(--ac-line); padding-left: 15px; margin: 2px 0 8px; }
-#athena-codex .aw-attempt-heading { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 0 0 5px; color: var(--ac-text); font-size: 14px; }
-#athena-codex .aw-attempt-heading strong { font-weight: 550; }
+#athena-codex .aw-attempt { min-width: 0; margin: -5px 0; }
+#athena-codex .aw-attempt-heading { display: flex; align-items: center; gap: 9px; list-style: none; padding: 7px 0; color: var(--ac-muted); font-size: 13px; line-height: 1.6; }
+#athena-codex .aw-attempt-heading::-webkit-details-marker { display: none; }
+#athena-codex .aw-attempt-heading strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+#athena-codex .aw-attempt-heading > svg { flex: none; width: 15px; height: 15px; }
+#athena-codex .aw-attempt-heading > svg:last-child { width: 11px; transform: rotate(-90deg); }
+#athena-codex .aw-attempt[open] > summary > svg:last-child { transform: none; }
+#athena-codex .aw-attempt > :not(summary) { margin-left: 24px; }
+@media(pointer:coarse) { #athena-codex .aw-attempt-heading { min-height: 44px; } }
 #athena-codex .aw-attempt-meta { margin: 0 0 8px; color: var(--ac-muted); font-size: 12px; }
 #athena-codex .aw-attempt .aw-agent-events { margin: 0; }
 #athena-codex .aw-attempt .aw-approval-inline { margin-top: 10px; }
 #athena-codex .aw-attempt-results { margin-top: 8px; }
 #athena-codex .aw-attempt-results:empty { display: none; }
+
+#athena-codex .ac-stream-handoff { font-size: 13px; color: var(--ac-muted); }
+#athena-codex .ac-stream-handoff > summary { padding: 5px 0; }
+#athena-codex .ac-stream-handoff > .ac-stream-text { margin: 8px 0; }
+
+#athena-codex .ac-stream-activity { min-width: 0; color: var(--ac-muted); font-size: 13px; }
+#athena-codex .ac-stream-activity > summary { width: fit-content; max-width: 100%; padding: 5px 0; }
+#athena-codex .ac-stream-steps { min-width: 0; padding: 6px 0 0 12px; border-left: 1px solid var(--ac-line); }
+#athena-codex .ac-stream-steps > .aw-attempt, #athena-codex .ac-stream-steps > .ac-stream-tool { margin: 2px 0; }

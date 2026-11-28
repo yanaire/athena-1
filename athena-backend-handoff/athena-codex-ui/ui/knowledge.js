@@ -65,6 +65,7 @@
     const initialSources = project => !runtimeMode && project === 'project-rc' ? SAMPLES.map((source, index) => sourceDefaults({ ...source, origin: 'sample', isSample: true, sessionOnly: false, pinned: index === 0, createdAt: '', order: index }, project)) : [];
     let sources = initialSources(projectId);
     const storageKey = () => KNOWLEDGE_NAMESPACE + ':' + encodeURIComponent(projectId);
+    const editionPinKey = source => storageKey() + ':pin:' + encodeURIComponent(source.id) + ':' + encodeURIComponent(source.sourceVersion);
     function loadProjectStorage() {
     try {
       const raw = window.localStorage.getItem(storageKey()) || (projectId === 'project-rc' ? window.localStorage.getItem(KNOWLEDGE_NAMESPACE) : null);
@@ -98,7 +99,7 @@
       <header class="akn-heading">
         <div class="akn-heading-top"><span class="akn-eyebrow">PROJECT LIBRARY</span><span class="akn-count" data-akn-total></span></div>
         <h2 id="${prefix}title">Knowledge</h2>
-        <p>Keep useful material close to the work.</p><p class="akn-project-scope" data-akn-project></p>
+        <p class="akn-project-scope" data-akn-project></p>
         <div class="akn-top-actions">
           <button type="button" class="akn-button akn-import-button cursor-interaction" data-akn-action="import">${icon('upload')}<span data-akn-import-label>Import files</span></button>
           <button type="button" class="akn-button cursor-interaction" data-akn-action="add-note" aria-expanded="false" aria-controls="${prefix}note-form">${icon('plus')}Add note</button>
@@ -108,7 +109,7 @@
       </header>
       <div class="akn-toolbar">
         <label class="akn-search"><span class="akn-sr-only">Search sources</span>${icon('search')}<input type="search" name="knowledge-search" placeholder="Search titles and text…" autocomplete="off" spellcheck="false"><button type="button" class="akn-search-clear cursor-interaction" data-akn-action="clear-search" aria-label="Clear source search" hidden>${icon('x')}</button></label>
-        <div class="akn-filters"><label class="akn-filter-label"><span class="akn-sr-only">Source type</span><select class="akn-filter cursor-interaction" aria-label="Source type"><option value="all">All sources</option><option value="documents">Documents</option><option value="notes">Notes</option><option value="datasets">Datasets</option></select></label><button type="button" class="akn-pinned-filter cursor-interaction" data-akn-action="pinned-filter" aria-pressed="false">${icon('pin')}Pinned</button></div>
+        <button type="button" class="akn-button" data-akn-find-papers hidden>Search and save papers</button><div class="akn-filters"><label class="akn-filter-label"><span class="akn-sr-only">Source type</span><select class="akn-filter cursor-interaction" aria-label="Source type"><option value="all">All sources</option><option value="documents">Documents</option><option value="notes">Notes</option><option value="datasets">Datasets</option></select></label><button type="button" class="akn-pinned-filter cursor-interaction" data-akn-action="pinned-filter" aria-pressed="false">${icon('pin')}Pinned</button></div>
       </div>
       <div class="akn-scroll">
         <form class="akn-note-form" id="${prefix}note-form" aria-labelledby="${prefix}note-title" novalidate hidden>
@@ -146,8 +147,27 @@
       notice.hidden = !message;
       notice.dataset.tone = tone;
     }
+    let searchingPapers=false;
+    const findPapers=q('[data-akn-find-papers]');
+    listen(findPapers,'click',async()=>{
+      const term=searchInput.value.trim(),project=projectId,bound=serviceEpoch;
+      if(!term){showNotice('Enter a public research topic or DOI.');searchInput.focus();return;}
+      if(searchingPapers||!service?.canSearch?.(project))return;
+      searchingPapers=true;findPapers.disabled=true;showNotice('Searching public literature…');
+      try{
+        const result=await service.searchAndSave({projectId:project,term,mode:/^10\.\d{4,9}\//i.test(term)?'doi':'query',requestId:crypto.randomUUID()});
+        if(destroyed||bound!==serviceEpoch||project!==projectId)return;
+        await refreshSources();
+        if(destroyed||bound!==serviceEpoch||project!==projectId)return;
+        if(result.saved?.length){query='';searchInput.value='';filter='documents';filterSelect.value=filter;selectedId=result.saved[0].sourceId;renderCollection();}
+        showNotice((result.saved?.length||0)+' paper editions saved.'+(result.error?' Crossref: '+result.error:''));
+      }catch(e){if(bound===serviceEpoch&&project===projectId)showNotice(e.message,'warning');}
+      finally{searchingPapers=false;findPapers.disabled=false;}
+    });
     function refreshStorageNote() {
+      findPapers.hidden=!service?.canSearch?.(projectId);
       storageNote.textContent = service ? 'Project file storage is connected. Each source shows whether its original was stored. Extraction and review are separate steps.' : storageMode === 'local' ? 'Files stay in this session. Notes and pins are saved for this project on this device. Original-file storage and PDF extraction are not connected.' : 'Storage is unavailable. Project files, notes, and pins stay in this session. Original-file storage and PDF extraction are not connected.';
+      if(service?.listSources&&service?.searchAndSave)storageNote.textContent='Research papers are saved in the project’s Athena Library folder and can be cited across its conversations.';
       q('[data-akn-project]').textContent = 'Project · ' + projectId;
     }
     function persist() {
@@ -199,8 +219,8 @@
         ${isPdf ? '<div class="akn-pdf-note">' + icon('info') + '<p>' + (source.extraction.status === 'ready' ? 'Extracted text is available for this version. PDF preview and extraction do not establish that its contents are correct or reviewed.' : service ? 'Native PDF preview only. Extraction status: ' + escape(source.extraction.status.replaceAll('_', ' ')) + '. Previewing a file does not read or understand its contents.' : 'Native PDF preview only. Text extraction, OCR, and indexing are not available. Previewing a file does not read or understand its contents.') + '</p></div><div class="akn-pdf-preview"></div>' + (source.text ? '<div class="akn-preview-heading"><h4>Extracted text</h4><span>Review: ' + escape(source.review.status.replaceAll('_', ' ')) + '</span></div><pre class="akn-text-preview" tabindex="0">' + escape(previewText) + '</pre>' + (source.text.length > 16000 ? '<p class="akn-truncated">Showing the first 16,000 characters. Search includes the full extracted text.</p>' : '') : '') : '<div class="akn-preview-heading"><h4>' + (source.format === 'CSV' ? 'CSV preview' : 'Text preview') + '</h4><span>Plain text</span></div><pre class="akn-text-preview" tabindex="0">' + escape(previewText) + '</pre>' + (source.text && source.text.length > 16000 ? '<p class="akn-truncated">Showing the first 16,000 characters. Search includes the full text.</p>' : '')}
         <div class="akn-source-actions"><button type="button" class="akn-button akn-primary cursor-interaction" data-akn-action="use-source">${icon('corner-down-left')}${!source.text ? 'Use file details in chat' : 'Use excerpt in chat'}</button>${source.artifactId && typeof options.onOpenArtifact === 'function' ? '<button type="button" class="akn-button cursor-interaction" data-akn-action="open-artifact">' + icon('arrow-up-right') + 'Open example artifact</button>' : ''}</div>
         ${!source.text ? '' : '<p class="akn-excerpt-hint">Adds up to 1,600 characters to the composer for your review. The exact source and version stay attached as metadata.</p>'}
-        ${!source.isSample ? '<div class="akn-service-actions"><button type="button" class="akn-button cursor-interaction" data-akn-action="store-original" ' + (!serviceAvailable('storeSource') || source.persistence === 'host' || sourceOperations.has(source.id) ? 'disabled' : '') + '>' + icon('hard-drive-upload') + (source.persistence === 'host' ? 'Original stored' : 'Store original') + '</button>' + (isPdf ? '<button type="button" class="akn-button cursor-interaction" data-akn-action="extract-text" ' + (!serviceAvailable('extractSource') || source.persistence !== 'host' || sourceOperations.has(source.id) || ['queued', 'extracting'].includes(source.extraction.status) ? 'disabled' : '') + '>' + icon('text-search') + 'Extract text</button>' : '') + '</div><p class="akn-service-note">' + (service ? 'Storage, extraction, and review require separate confirmations from the project service.' : 'Connect project storage to preserve original files beyond this session.') + '</p>' : ''}
-        ${source.isSample ? '' : '<button type="button" class="akn-remove-button cursor-interaction" data-akn-action="remove">' + icon('trash-2') + 'Remove source</button>'}`;
+        ${source.paperCoverage ? '<p class="akn-service-note">'+escape(source.paperCoverage)+' · '+escape(source.originalLocation.label)+'</p>'+(source.paperDetail?'<p>'+escape(source.paperDetail)+'</p>':'')+(source.originalUri?'<a class="akn-button" href="'+escape(source.originalUri)+'" download>Download original</a>':'') : !source.isSample ? '<div class="akn-service-actions"><button type="button" class="akn-button cursor-interaction" data-akn-action="store-original" ' + (!serviceAvailable('storeSource') || source.persistence === 'host' || sourceOperations.has(source.id) ? 'disabled' : '') + '>' + icon('hard-drive-upload') + (source.persistence === 'host' ? 'Original stored' : 'Store original') + '</button>' + (isPdf ? '<button type="button" class="akn-button cursor-interaction" data-akn-action="extract-text" ' + (!serviceAvailable('extractSource') || source.persistence !== 'host' || sourceOperations.has(source.id) || ['queued', 'extracting'].includes(source.extraction.status) ? 'disabled' : '') + '>' + icon('text-search') + 'Extract text</button>' : '') + '</div><p class="akn-service-note">' + (service ? 'Storage, extraction, and review require separate confirmations from the project service.' : 'Connect project storage to preserve original files beyond this session.') + '</p>' : ''}
+        ${source.isSample || source.paperCoverage ? '' : '<button type="button" class="akn-remove-button cursor-interaction" data-akn-action="remove">' + icon('trash-2') + 'Remove source</button>'}`;
       if (isPdf) {
         const container = detail.querySelector('.akn-pdf-preview');
         const url = fileVersions.get(source.id) === source.sourceVersion ? blobUrls.get(source.id) : null;
@@ -330,19 +350,26 @@
       const validExtraction = ['not_requested', 'queued', 'extracting', 'ready', 'failed', 'unsupported'].includes(value.extraction?.status) && String(value.extraction.version) === version;
       const validReview = ['unreviewed', 'in_review', 'approved', 'changes_requested'].includes(value.review?.status) && String(value.review.version) === version;
       if (value.extraction?.status === 'ready' && (!validExtraction || typeof value.text !== 'string')) throw new Error('Extraction was reported as ready without text for this source version.');
-      return sourceDefaults({ id: value.sourceId, title: value.title, text: typeof value.text === 'string' ? value.text : '', kind: value.kind, format: String(value.format || 'TEXT').toUpperCase(), origin: 'host', isSample: false, sessionOnly: false, pinned: false, size: value.size || null, createdAt: value.createdAt || '', order: -Date.now(), sourceVersion: version, originalLocation: { ...value.originalLocation }, persistence: 'host', extraction: validExtraction ? { ...value.extraction } : { status: 'not_requested', version }, review: validReview ? { ...value.review } : { status: 'unreviewed', version } }, expectedProject);
+      return sourceDefaults({ id: value.sourceId, title: value.title, text: typeof value.text === 'string' ? value.text : '', kind: value.kind, format: String(value.format || 'TEXT').toUpperCase(), origin: 'host', isSample: false, sessionOnly: false, pinned: false, size: value.size || null, createdAt: value.createdAt || '', order: -Date.now(), sourceVersion: version, originalLocation: { ...value.originalLocation }, persistence: 'host', paperCoverage:value.coverage, paperDetail:value.detail, originalFile:value.originalFile, originalUri: /^\/api\/artifacts\/[\w-]+\/library-[a-f0-9]{64}$/.test(value.originalUri || '') ? value.originalUri : null, extraction: validExtraction ? { ...value.extraction } : { status: 'not_requested', version }, review: validReview ? { ...value.review } : { status: 'unreviewed', version } }, expectedProject);
     }
-    function mergeHostSource(value, expectedId = null) {
+    function mergeHostSource(value, expectedId = null, render = true) {
       const next = checkedHostSource(value, projectId, expectedId), existing = sources.find(item => item.id === next.id);
+      if (existing && existing.sourceVersion === next.sourceVersion) {
+        next.pinned = existing.pinned;
+      } else {
+        try { next.pinned = window.localStorage.getItem(editionPinKey(next)) === '1'; }
+        catch (_) { /* Storage may be unavailable in this window. */ }
+      }
       if (!existing) sources.push(next);
       else {
         const versions = existing.versions;
         if (existing.sourceVersion !== next.sourceVersion && !versions.some(version => version.sourceVersion === existing.sourceVersion)) {
           const previous = { ...existing, originalLocation: { ...existing.originalLocation }, extraction: { ...existing.extraction }, review: { ...existing.review } }; delete previous.versions; versions.push(previous);
         }
-        Object.assign(existing, next, { pinned: existing.pinned, origin: existing.origin, order: existing.order, versions });
+        Object.assign(existing, next, { origin: existing.origin, order: existing.order, versions });
       }
-      renderCollection(); refreshStorageNote(); return next;
+      if (render) { renderCollection(); refreshStorageNote(); }
+      return next;
     }
     async function refreshSources() {
       if (!serviceAvailable('listSources') || destroyed) return false;
@@ -352,8 +379,8 @@
         if (destroyed || bound !== serviceEpoch || scope !== projectEpoch || target !== service || project !== projectId) return false;
         if (!Array.isArray(result?.sources)) throw new Error('The source service did not return a project source list.');
         result.sources.forEach(value => checkedHostSource(value, project));
-        result.sources.forEach(value => mergeHostSource(value));
-        renderCollection(); return true;
+        result.sources.forEach(value => mergeHostSource(value, null, false));
+        refreshStorageNote(); renderCollection(); return true;
       } catch (error) {
         if (!destroyed && bound === serviceEpoch && scope === projectEpoch) showNotice(String(error?.message || error), 'warning');
         return false;
@@ -473,10 +500,22 @@
       if (action === 'reset-filters') { restoreFullList(); renderCollection(); searchInput.focus({ preventScroll: true }); }
       if (action === 'pin' && source) {
         source.pinned = !source.pinned;
-        persist();
+        let sessionOnly = false;
+        if (source.origin !== 'host') {
+          // A promoted device note is restored before its host edition arrives.
+          persist();
+          sessionOnly = storageMode === 'session';
+        }
+        if (source.persistence === 'host') {
+          try {
+            const key = editionPinKey(source);
+            if (source.pinned) window.localStorage.setItem(key, '1');
+            else window.localStorage.removeItem(key);
+          } catch (_) { sessionOnly = true; }
+        }
         renderCollection();
         (detail.querySelector('[data-akn-action="pin"]') || pinnedFilter).focus({ preventScroll: true });
-        if (storageMode === 'session') showNotice('Pin changes are kept for this session because persistent storage is unavailable.');
+        if (sessionOnly) showNotice('Pin changes are kept for this session because persistent storage is unavailable.');
       }
       if (action === 'use-source' && source) {
         if (typeof options.onUseSource === 'function') {
@@ -505,6 +544,7 @@
     const api = {
       open(settings = {}) {
         if (destroyed) return;
+        refreshStorageNote();if(service?.searchAndSave)void refreshSources();
         if (settings && typeof settings === 'object') {
           if (typeof settings.query === 'string') { query = settings.query; searchInput.value = query; }
           if (typeof settings.sourceId === 'string' && sources.some(source => source.id === settings.sourceId)) {

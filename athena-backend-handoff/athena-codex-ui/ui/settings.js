@@ -113,7 +113,7 @@
               <div class="ast-workspace-illustration" aria-hidden="true"><span class="ast-mini-sidebar"></span><span class="ast-mini-chat"><i></i><i></i><i></i><b></b></span><span class="ast-mini-panel"></span></div>
               <p class="ast-workspace-caption">Drag a panel edge to adjust its width. Double-click the edge to reset it.</p>
             </section>
-            <section class="ast-panel" tabindex="0" id="ast-panel-models" role="tabpanel" aria-labelledby="ast-tab-models" hidden><div id="ast-model-settings-slot"></div><div id="ast-provider-profiles-slot"></div></section>
+            <section class="ast-panel" tabindex="0" id="ast-panel-models" role="tabpanel" aria-labelledby="ast-tab-models" hidden><div id="ast-worker-models-slot"></div><div id="ast-model-settings-slot"></div><div id="ast-provider-profiles-slot"></div></section>
             <section class="ast-panel" tabindex="0" id="ast-panel-pi" role="tabpanel" aria-labelledby="ast-tab-pi" hidden><div id="ast-pi-workbench-slot"></div></section>
             <section class="ast-panel" tabindex="0" id="ast-panel-connections" role="tabpanel" aria-labelledby="ast-tab-connections" hidden>
               <div class="ast-section-heading"><h2>Connections</h2><p>Tools and skills available in the composer.</p></div>
@@ -222,7 +222,7 @@
       const mode = section === 'appearance' ? (sessionOnly ? 'session' : 'automatic') : (section === 'models' || section === 'execution' && !window.AthenaHosted) ? 'explicit' : 'host';
       q('.ast-footer').dataset.saveMode = mode;
       const messages = {
-        models: 'Model changes require Save settings. Connection checks are separate.',
+        models: window.AthenaHosted ? 'Worker assignments save when selected and apply to the next run.' : 'Model changes require Save settings. Connection checks are separate.',
         execution: window.AthenaHosted ? 'The host controls execution policy for this project.' : 'Role preferences require Save settings. Runtime controls apply to the current session.',
         tools: 'Package changes apply to new runs. Tool controls reflect the current runtime.',
         files: 'Files and history are stored only when the project host confirms the write.',
